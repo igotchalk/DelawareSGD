@@ -32,21 +32,23 @@ class ModelSGD(Seawat):
     def write_output(self,fname='flux.smp'):
         #Get flux at ocean boundary
         try:
-            ocean_col = self.storage_dict['ocean_col']
+            ocean_bool = self.storage_dict['ocean_bool']
         except KeyError:
-            ocean_col = self.ocean_col
-        ocean_outflow = utils.get_ocean_outflow_chd(self,ocean_col)
-        ocean_col_vec = np.arange(ocean_col[0],ocean_col[1]+2)
-        print(type(ocean_outflow))
-        print(ocean_outflow)
+            ocean_bool = self.ocean_bool
+        ocean_outflow = utils.get_ocean_outflow_chd(self,ocean_bool)[ocean_bool]
+        ocean_sub  = np.where(ocean_bool) #tuple of arrays giving indicies of ocean
+        
         #Print out coordinates and flux to text file
         fout= open(os.path.join(self.model_ws,fname),"w")
         fout.write('Values are zero-based \n')
         fout.write('{:14s} {:4s} {:4s} {:4s} \n'
                    .format("flux", "lay","row", "col"))
-        for i in range(len(ocean_outflow)):
+        for i in range(ocean_outflow.size):
              fout.write('{:14.4e} {:4d} {:4d} {:4d}\n'
-                        .format(ocean_outflow[i],0,0,ocean_col_vec[i]))
+                        .format(ocean_outflow[:][i],
+                                ocean_sub[0][i],
+                                ocean_sub[1][i],
+                                ocean_sub[2][i],))
         fout.close()
         print('output FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
         return
@@ -242,15 +244,14 @@ class ModelSGD(Seawat):
     def write_ref_file(self,d=None):
         from pathlib import Path
         if d==None:
-            d = {'model_ws':Path(self.model_ws),
+            d = {'model_ws':Path(self.model_ws).as_posix(),
             'modelname': self.name,
             'ocean_col': self.storage_dict['ocean_col']
             }
-        fname = Path(os.path.join(self.model_ws,'..','..','ref_file.txt'))
-        #write the file
-        fo = open(fname, "w")
+        fname = Path(os.path.abspath(os.path.join(self.model_ws,'..','..','ref_file.txt'))).as_posix()
+        fo = open(str(fname), "w")
         for k, v in d.items():
             fo.write('<<<' + str(k) + '>>>'+ str(v) + '\n')
         fo.close()
-        print('reference FILE WRITTEN: ' + str(fname))
+        print('reference FILE WRITTEN: ' + fname)
         return

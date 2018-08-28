@@ -88,6 +88,7 @@ def plot_background(mm,array,label=None):
 
 def trypath(fun,path):
     try:
-        fun(path)
+        res = fun(path)
     except:
-        fun(r""+path)
+        res = fun(r""+path)
+    return res

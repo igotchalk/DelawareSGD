@@ -1,11 +1,12 @@
 import os
+from pathlib import Path
 import sys
 import numpy as np
 from __main__ import *
 import flopy
 
 base_dir = os.path.abspath(os.getcwd())
-model_ws = os.path.join(base_dir,'work',modelname)
+model_ws = Path(os.path.join(base_dir,'work',modelname)).as_posix()
 sys.path.append(base_dir)
 import SGD
 
