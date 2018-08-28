@@ -1,0 +1,3 @@
+<<<model_ws>>>/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/sgd
+<<<modelname>>>sgd
+<<<ocean_col>>>[30, 69]

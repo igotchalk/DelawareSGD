@@ -1,0 +1,164 @@
+
+     PEST RUN RECORD: CASE e:\projects\delawaresgd\work\test2\test2
+
+
+PEST run mode:-
+
+   Parameter estimation mode
+
+
+Case dimensions:-
+
+   Number of parameters                           :    1
+   Number of adjustable parameters                :    1
+   Number of parameter groups                     :    1
+   Number of observations                         :   40
+   Number of prior estimates                      :    0
+
+
+Model command line(s):-
+
+   SGD_runmodel.bat
+
+
+Jacobian command line:-
+
+   na
+
+
+Model interface files:-
+
+   Templates:
+      E:\Projects\DelawareSGD\work\test2\test2.lpf.tpl
+   for model input files:
+      E:\Projects\DelawareSGD\work\test2\test2.lpf
+
+   (Parameter values written using double precision protocol.)
+   (Decimal point always included.)
+
+   Instruction files:
+      E:\Projects\DelawareSGD\work\test2\flux.ins
+   for reading model output files:
+      E:\Projects\DelawareSGD\work\test2\flux.smp
+
+
+PEST-to-model message file:-
+
+   na
+
+
+Derivatives calculation:-
+
+Param        Increment   Increment   Increment   Forward or   Multiplier  Method
+group        type                    low bound   central      (central)   (central)
+hk           relative    1.0000E-02   none         switch       2.000     parabolic
+
+
+Parameter definitions:-
+
+Name         Trans-            Change       Initial        Lower          Upper
+             formation         limit        value          bound          bound
+hk_2         log               factor      56.3846       1.000000E-03    1000.00    
+
+Name         Group          Scale         Offset        Model command number
+hk_2         hk            1.00000        0.00000            1
+
+
+Prior information:-
+
+   No prior information supplied
+
+
+Observations:-
+
+Observation name        Observation       Weight       Group
+ flux_0                 5.990000E-04      10.00       heads       
+ flux_1                 5.940000E-04      10.00       heads       
+ flux_2                 5.830000E-04      10.00       heads       
+ flux_3                 5.680000E-04      10.00       heads       
+ flux_4                 5.470000E-04      10.00       heads       
+ flux_5                 5.230000E-04      10.00       heads       
+ flux_6                 4.940000E-04      10.00       heads       
+ flux_7                 4.600000E-04      10.00       heads       
+ flux_8                 4.220000E-04      10.00       heads       
+ flux_9                 3.780000E-04      10.00       heads       
+ flux_10                3.320000E-04      10.00       heads       
+ flux_11                2.860000E-04      10.00       heads       
+ flux_12                2.420000E-04      10.00       heads       
+ flux_13                2.010000E-04      10.00       heads       
+ flux_14                1.640000E-04      10.00       heads       
+ flux_15                1.330000E-04      10.00       heads       
+ flux_16                1.090000E-04      10.00       heads       
+ flux_17                8.900000E-05      10.00       heads       
+ flux_18                7.600000E-05      10.00       heads       
+ flux_19               -2.470000E-04      10.00       heads       
+ flux_20               -5.870000E-04      10.00       heads       
+ flux_21               -7.750000E-04      10.00       heads       
+ flux_22               -8.880000E-04      10.00       heads       
+ flux_23               -9.690000E-04      10.00       heads       
+ flux_24               -1.011000E-03      10.00       heads       
+ flux_25               -1.012000E-03      10.00       heads       
+ flux_26               -1.014000E-03      10.00       heads       
+ flux_27               -1.016000E-03      10.00       heads       
+ flux_28               -1.018000E-03      10.00       heads       
+ flux_29               -1.020000E-03      10.00       heads       
+ flux_30               -1.022000E-03      10.00       heads       
+ flux_31               -1.025000E-03      10.00       heads       
+ flux_32               -1.028000E-03      10.00       heads       
+ flux_33               -1.031000E-03      10.00       heads       
+ flux_34               -1.033000E-03      10.00       heads       
+ flux_35               -1.035000E-03      10.00       heads       
+ flux_36               -1.037000E-03      10.00       heads       
+ flux_37               -1.038000E-03      10.00       heads       
+ flux_38               -1.039000E-03      10.00       heads       
+ flux_39               -1.039000E-03      10.00       heads       
+
+
+Control settings:-
+
+   Initial lambda                                               :  10.000    
+   Lambda adjustment factor                                     : iteration-dependent
+   Value of variable governing adjustment                       : -3.0000    
+   Sufficient new/old phi ratio per optimisation iteration      : 0.30000    
+   Limiting relative phi reduction between lambdas              : 3.00000E-02
+   Maximum trial lambdas per iteration                          :  10
+   Forgive model run failure during lamda testing               : no
+
+   Perform Broyden's update of Jacobian matrix                  : no
+
+   Maximum  factor  parameter change (factor-limited changes)   :  10.000
+   Maximum relative parameter change (relative-limited changes) : na
+   Fraction of initial parameter values used in computing
+   change limit for near-zero parameters                        : 1.00000E-03
+   Allow bending of parameter upgrade vector                    : no
+   Allow parameters to stick to their bounds                    : no
+
+   Relative phi reduction below which to begin use of
+   central derivatives                                          : 0.10000             
+   Iteration at which to first consider derivatives switch      :   1
+
+   Relative phi reduction indicating convergence                : 0.50000E-02
+   Number of phi values required within this range              :   4
+   Maximum number of consecutive failures to lower phi          :   4
+   Minimal relative parameter change indicating convergence     : 0.50000E-02
+   Number of consecutive iterations with minimal param change   :   4
+   Maximum number of optimisation iterations                    :  30
+   Objective function termination limit                         : 0.10000E-04
+
+   Attempt automatic user intervention                          : no
+
+   Attempt reuse of parameter sensitivities                     : no
+
+
+File saving options: -
+
+   Save multiple JCO files                                      : no
+   Save multiple REI files                                      : no
+
+
+
+******************************************************************************
+Error condition prevents continued PEST execution:-
+
+Cannot delete file E:\Projects\DelawareSGD\work\test2\flux.smp.
+******************************************************************************
