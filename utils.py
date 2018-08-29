@@ -85,10 +85,17 @@ def plot_background(mm,array,label=None):
     cpatchcollection = mm.plot_array(array,cmap='jet')
     cpatchcollection.set_label(label)
     return cpatchcollection,label
-
-def trypath(fun,path):
-    try:
-        res = fun(path)
-    except:
-        res = fun(r""+path)
-    return res
+    
+def read_ref(fname='ref_file.txt'):
+    import re
+    #Load ref file to get info about model
+    reffile = os.path.join('.',fname)
+    reftext = open(reffile, 'r').read()    
+    beg = [m.start() for m in re.finditer('<<<', reftext)]
+    betw = [m.start() for m in re.finditer('>>>', reftext)]
+    end = [m.start() for m in re.finditer('\n', reftext)]
+    d = {}
+    for i in range(len(beg)):
+        d[str(reftext[beg[i]+3:betw[i]])] =  reftext[betw[i]+3:end[i]] 
+    return d
+    #[exec(reftext[beg[i]+3:betw[i]]) for i in range(len(beg))]

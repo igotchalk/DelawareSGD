@@ -35,7 +35,7 @@ def write_swt_input(modelname):
     Lx = 70.
     Lz = 20.
     nlay = 40
-    nrow = 1
+    nrow = 3
     ncol = 70
     delr = Lx / ncol
     delc = 1.0
@@ -205,12 +205,14 @@ def write_swt_input(modelname):
     m.write_input()
     #Create a storage dictionary to pass to SGD model
     storage_dict = {'ocean_col': ocean_col,
+    'model_ws':m.model_ws,
+    'modelname':m.name,
     'ocean_bool': ocean_bool,
     'head_inland': head_inland,
     'ocean_head': ocean_head,
     'start_fresh_yn': start_fresh_yn
     }
-
+    m.ocean_bool = ocean_bool
     m.set_ocean_arr(ocean_col_vec)
     m.set_storage_dict(storage_dict)
     return m, ocean_col

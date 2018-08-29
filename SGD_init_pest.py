@@ -23,7 +23,7 @@ modelname = sys.argv[1]
 
 import SGD_writeSWinput
 m, ocean_col = SGD_writeSWinput.write_swt_input(modelname)
-m.write_ref_file()
+m.write_ref_file(m.storage_dict)
 
 ################
 #3 Run SEAWAT model

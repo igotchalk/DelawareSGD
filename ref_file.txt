@@ -1,3 +1,7 @@
-<<<model_ws>>>E:/Projects/DelawareSGD/work/newtest
-<<<modelname>>>newtest
 <<<ocean_col>>>[30, 69]
+<<<model_ws>>>/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/sgd0828
+<<<modelname>>>sgd0828
+<<<ocean_bool>>>/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/ocean_bool.npy
+<<<head_inland>>>20.1
+<<<ocean_head>>>20.0
+<<<start_fresh_yn>>>0
