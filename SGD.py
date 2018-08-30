@@ -9,10 +9,11 @@ import utils
 #Subclass of flopy.seawat.Seawat
 #    Carries relevant info about the ocean boundary and other info
 class ModelSGD(Seawat):
-    def __init__(self,ocean_arr = None,storage_dict=None, ocean_col=[30,69]):
+    def __init__(self,ocean_arr = None,storage_dict=None, ocean_col=[30,69],ocean_bool=None):
         super(Seawat, self).__init__()  #inherit Seawat properties
         
         #Set other properties
+        self.ocean_bool = ocean_bool
         self.ocean_arr = ocean_arr
         self.storage_dict = storage_dict
         self.ocean_col = ocean_col
@@ -31,24 +32,23 @@ class ModelSGD(Seawat):
         return
     def write_output(self,fname='flux.smp'):
         #Get flux at ocean boundary
-        try:
-            ocean_bool = self.storage_dict['ocean_bool']
-        except KeyError:
-            ocean_bool = self.ocean_bool
+        d = utils.read_ref()
+        if 'ocean_bool' in d:
+            ocean_bool = np.load(d['ocean_bool'])
+        elif self.ocean_arr is not None:
+            ocean_bool = self.ocean_arr
+        else:
+            pass
         ocean_outflow = utils.get_ocean_outflow_chd(self,ocean_bool)[ocean_bool]
-        ocean_sub  = np.where(ocean_bool) #tuple of arrays giving indicies of ocean
-        
+        ocean_sub = np.where(ocean_bool) #tuple of arrays giving indicies of ocean
+        print('ocean_outflow: ',np.shape(ocean_outflow))
+        print('ocean_bool: ',np.shape(ocean_bool))
         #Print out coordinates and flux to text file
         fout= open(os.path.join(self.model_ws,fname),"w")
         fout.write('Values are zero-based \n')
-        fout.write('{:14s} {:4s} {:4s} {:4s} \n'
-                   .format("flux", "lay","row", "col"))
+        fout.write('{:14s} {:4s} {:4s} {:4s} \n'.format("flux", "lay","row", "col"))
         for i in range(ocean_outflow.size):
-             fout.write('{:14.4e} {:4d} {:4d} {:4d}\n'
-                        .format(ocean_outflow[:][i],
-                                ocean_sub[0][i],
-                                ocean_sub[1][i],
-                                ocean_sub[2][i],))
+            fout.write('{:14.4e} {:4d} {:4d} {:4d}\n'.format(ocean_outflow[i],ocean_sub[0][i],ocean_sub[1][i],ocean_sub[2][i]))
         fout.close()
         print('output FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
         return
@@ -68,30 +68,37 @@ class ModelSGD(Seawat):
     #Write instruction file
     def write_ins(self,fname = 'flux.ins',obs_name = 'flux'):
         #Get flux at ocean boundary so you know how many lines to write
-        ocean_col = self.storage_dict['ocean_col']
-        ocean_col_vec = np.arange(ocean_col[0],ocean_col[1]+1)
-        ocean_outflow = utils.get_ocean_outflow_chd(self,ocean_col)
+        d = utils.read_ref()
+        if 'ocean_bool' in d:
+            ocean_bool = np.load(d['ocean_bool'])
+        elif self.ocean_arr is not None:
+            ocean_bool = self.ocean_arr
+        else:
+            pass
+        ocean_outflow = utils.get_ocean_outflow_chd(self,ocean_bool)[ocean_bool]
 
         #Write an instruction file
-        finst = open(os.path.join(self.model_ws,fname),"w")
+        finst = open(Path(os.path.join(self.model_ws,fname)).as_posix(),"w")
         finst.write('pif #\n')
         finst.write('#flux#\n')
-        for i in range(len(ocean_outflow)):
+        for i in range(ocean_outflow.size):
              finst.write('l1 w !{:s}!\n'.format(obs_name + '_' + str(i)))
         finst.close()
-        print('.ins FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
+        print('.ins FILE WRITTEN: ' + Path(os.path.join(self.model_ws, fname)).as_posix())
         nobs = len(ocean_outflow)
         ins_data = [obs_name,nobs,ocean_outflow]
         return ins_data
     
     #Make template file
-    def write_tpl(self,zonearray=None, parzones = [2],lbound = 0.001,
-                  ubound = 1000.,transform='log'):
+    def write_tpl(self,zonearray=None, parzones=None,lbound=0.001,
+                  ubound=1000.,transform='log'):
         mfpackage = 'lpf'
         partype = 'hk'
         if zonearray == None:
             zonearray = np.ones((self.nlay, self.nrow, self.ncol), dtype=int)
-            zonearray[2] = 2 #make layer 3 the zone (zone # 2) that will be parameterized
+            zonearray[2] = 2 #call layer 3 zone #2
+        if parzones == None:
+            parzones = [2]  #make zone #2 the zone to be parameterized
         lpf = self.get_package(mfpackage)
         parvals = [np.mean(lpf.hk.array)]
         
@@ -240,18 +247,59 @@ class ModelSGD(Seawat):
         f.close()
         print('.pst FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
         return
-
-    def write_ref_file(self,d=None):
+        
+    def write_ref_file(self,d=None,ocean_bool_npy=None):
         from pathlib import Path
-        if d==None:
+        if d!=None:
+            pass
+        elif d==None and self.storage_dict!=None:
+            d = self.storage_dict
+        elif d==None and self.storage_dict==None:
             d = {'model_ws':Path(self.model_ws).as_posix(),
             'modelname': self.name,
-            'ocean_col': self.storage_dict['ocean_col']
+            'ocean_col': self.storage_dict['ocean_col'],
             }
+        else:
+            pass
+        if ocean_bool_npy is None:
+            ocean_bool_npy = str(Path(os.path.abspath(os.path.join(self.model_ws,'..','..','ocean_bool.npy'))).as_posix())
+        d['ocean_bool'] = ocean_bool_npy
+        try:
+            os.remove(d['ocean_bool'])
+        except:
+            pass
+        np.save(d['ocean_bool'], self.ocean_bool)
+        #write the ocean_bool csv
         fname = Path(os.path.abspath(os.path.join(self.model_ws,'..','..','ref_file.txt'))).as_posix()
         fo = open(str(fname), "w")
         for k, v in d.items():
             fo.write('<<<' + str(k) + '>>>'+ str(v) + '\n')
         fo.close()
         print('reference FILE WRITTEN: ' + fname)
+        return
+
+    def plot_hk_ibound(self,rowslice=0):
+        import matplotlib.pyplot as plt
+        import matplotlib.colors
+        import numpy as np
+        hk = self.get_package('LPF').hk.array
+
+        # Make plot of the grid
+        f = plt.figure(figsize=(15, 5))
+        plt.clf()
+        ax = f.add_subplot(1, 1, 1)
+        mm = flopy.plot.ModelCrossSection(ax=ax, model=self, line={'row':rowslice});
+        hkpatchcollection = mm.plot_array(hk, norm=matplotlib.colors.LogNorm(),
+                                          vmin=np.min(hk), vmax=np.max(hk),cmap='jet');
+        linecollectdsion = mm.plot_grid();
+        patchcollection = mm.plot_ibound(color_ch='orange');
+        cb = plt.colorbar(patchcollection);
+        cb.set_label('Boundary condition',rotation=90)
+        cb.set_ticks((1.5,2.5))
+        #cb.set_ticklabels(('No flow','Const head'))
+        cb.ax.set_yticklabels(('No flow','Const head'),rotation=90)
+        cb2 = plt.colorbar(hkpatchcollection,ax=ax);
+        cb2.set_label('Kh (m/d)', rotation=90)
+        plt.title('K-field & Boundary conditions');
+        plt.show()
         return

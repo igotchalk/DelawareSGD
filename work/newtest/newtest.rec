@@ -1,0 +1,397 @@
+
+   PEST RUN RECORD: CASE e:\projects\delawaresgd\work\newtest\newtest
+
+
+PEST run mode:-
+
+   Parameter estimation mode
+
+
+Case dimensions:-
+
+   Number of parameters                           :    1
+   Number of adjustable parameters                :    1
+   Number of parameter groups                     :    1
+   Number of observations                         :   40
+   Number of prior estimates                      :    0
+
+
+Model command line(s):-
+
+   SGD_runmodel.bat
+
+
+Jacobian command line:-
+
+   na
+
+
+Model interface files:-
+
+   Templates:
+      E:/Projects/DelawareSGD/work/newtest\newtest.lpf.tpl
+   for model input files:
+      E:/Projects/DelawareSGD/work/newtest\newtest.lpf
+
+   (Parameter values written using double precision protocol.)
+   (Decimal point always included.)
+
+   Instruction files:
+      E:/Projects/DelawareSGD/work/newtest\flux.ins
+   for reading model output files:
+      E:/Projects/DelawareSGD/work/newtest\flux.smp
+
+
+PEST-to-model message file:-
+
+   na
+
+
+Derivatives calculation:-
+
+Param        Increment   Increment   Increment   Forward or   Multiplier  Method
+group        type                    low bound   central      (central)   (central)
+hk           relative    1.0000E-02   none         switch       2.000     parabolic
+
+
+Parameter definitions:-
+
+Name         Trans-            Change       Initial        Lower          Upper
+             formation         limit        value          bound          bound
+hk_2         log               factor      72.2693       1.000000E-03    1000.00    
+
+Name         Group          Scale         Offset        Model command number
+hk_2         hk            1.00000        0.00000            1
+
+
+Prior information:-
+
+   No prior information supplied
+
+
+Observations:-
+
+Observation name        Observation       Weight       Group
+ flux_0                 0.227180          10.00       heads       
+ flux_1                 0.123860          10.00       heads       
+ flux_2                 7.409100E-02      10.00       heads       
+ flux_3                 4.831200E-02      10.00       heads       
+ flux_4                 3.440900E-02      10.00       heads       
+ flux_5                 2.671200E-02      10.00       heads       
+ flux_6                 2.188200E-02      10.00       heads       
+ flux_7                 1.895900E-02      10.00       heads       
+ flux_8                 1.717500E-02      10.00       heads       
+ flux_9                 1.598400E-02      10.00       heads       
+ flux_10                1.513900E-02      10.00       heads       
+ flux_11                1.459700E-02      10.00       heads       
+ flux_12                1.413800E-02      10.00       heads       
+ flux_13                1.374200E-02      10.00       heads       
+ flux_14                1.339500E-02      10.00       heads       
+ flux_15                1.308300E-02      10.00       heads       
+ flux_16                1.279900E-02      10.00       heads       
+ flux_17                1.253700E-02      10.00       heads       
+ flux_18                1.229500E-02      10.00       heads       
+ flux_19                1.207000E-02      10.00       heads       
+ flux_20                1.186000E-02      10.00       heads       
+ flux_21                1.166600E-02      10.00       heads       
+ flux_22                1.148500E-02      10.00       heads       
+ flux_23                1.131700E-02      10.00       heads       
+ flux_24                1.116100E-02      10.00       heads       
+ flux_25                1.101600E-02      10.00       heads       
+ flux_26                1.088200E-02      10.00       heads       
+ flux_27                1.076000E-02      10.00       heads       
+ flux_28                1.064900E-02      10.00       heads       
+ flux_29                1.054900E-02      10.00       heads       
+ flux_30                1.045800E-02      10.00       heads       
+ flux_31                1.037800E-02      10.00       heads       
+ flux_32                1.030800E-02      10.00       heads       
+ flux_33                1.024700E-02      10.00       heads       
+ flux_34                1.019500E-02      10.00       heads       
+ flux_35                1.015200E-02      10.00       heads       
+ flux_36                1.011800E-02      10.00       heads       
+ flux_37                1.009300E-02      10.00       heads       
+ flux_38                1.007600E-02      10.00       heads       
+ flux_39                1.006800E-02      10.00       heads       
+
+
+Control settings:-
+
+   Initial lambda                                               :  10.000    
+   Lambda adjustment factor                                     : iteration-dependent
+   Value of variable governing adjustment                       : -3.0000    
+   Sufficient new/old phi ratio per optimisation iteration      : 0.30000    
+   Limiting relative phi reduction between lambdas              : 3.00000E-02
+   Maximum trial lambdas per iteration                          :  10
+   Forgive model run failure during lamda testing               : no
+
+   Perform Broyden's update of Jacobian matrix                  : no
+
+   Maximum  factor  parameter change (factor-limited changes)   :  10.000
+   Maximum relative parameter change (relative-limited changes) : na
+   Fraction of initial parameter values used in computing
+   change limit for near-zero parameters                        : 1.00000E-03
+   Allow bending of parameter upgrade vector                    : no
+   Allow parameters to stick to their bounds                    : no
+
+   Relative phi reduction below which to begin use of
+   central derivatives                                          : 0.10000             
+   Iteration at which to first consider derivatives switch      :   1
+
+   Relative phi reduction indicating convergence                : 0.50000E-02
+   Number of phi values required within this range              :   4
+   Maximum number of consecutive failures to lower phi          :   4
+   Minimal relative parameter change indicating convergence     : 0.50000E-02
+   Number of consecutive iterations with minimal param change   :   4
+   Maximum number of optimisation iterations                    :  30
+   Objective function termination limit                         : 0.10000E-04
+
+   Attempt automatic user intervention                          : no
+
+   Attempt reuse of parameter sensitivities                     : no
+
+
+File saving options: -
+
+   Save multiple JCO files                                      : no
+   Save multiple REI files                                      : no
+
+
+                            OPTIMISATION RECORD
+
+
+INITIAL CONDITIONS: 
+   Sum of squared weighted residuals (ie phi) =  5.17440E-05
+
+      Current parameter values
+      hk_2             72.2693    
+
+
+OPTIMISATION ITERATION NO.        : 1
+   Model calls so far             : 1
+   Starting phi for this iteration:  5.17440E-05
+
+       Lambda =   10.000     ----->
+          Phi =  4.84596E-05  (  0.937 of starting phi)
+
+       Lambda =   4.6416     ----->
+          Phi =  4.84596E-05  (  0.937 of starting phi)
+
+   No more lambdas: relative phi reduction between lambdas less than 0.0300
+   Lowest phi this iteration:  4.84596E-05
+   Relative phi reduction between optimisation iterations less than 0.1000
+   Switch to central derivatives calculation
+
+      Current parameter values                 Previous parameter values
+      hk_2             71.2034                 hk_2              72.2693    
+   Maximum   factor change:  1.015     ["hk_2"]
+   Maximum relative change: 1.4748E-02 ["hk_2"]
+
+
+OPTIMISATION ITERATION NO.        : 2
+   Model calls so far             : 4
+   Starting phi for this iteration:  4.84596E-05
+
+       Lambda =   4.6416     ----->
+          Phi =  4.81178E-05  (  0.993 of starting phi)
+
+       Lambda =   2.3208     ----->
+          Phi =  4.81178E-05  (  0.993 of starting phi)
+
+   No more lambdas: relative phi reduction between lambdas less than 0.0300
+   Lowest phi this iteration:  4.81178E-05
+
+      Current parameter values                 Previous parameter values
+      hk_2             71.1782                 hk_2              71.2034    
+   Maximum   factor change:  1.000     ["hk_2"]
+   Maximum relative change: 3.5403E-04 ["hk_2"]
+
+
+OPTIMISATION ITERATION NO.        : 3
+   Model calls so far             : 8
+   Starting phi for this iteration:  4.81178E-05
+
+       Lambda =   2.3208     ----->
+          Phi =  4.83042E-05  (  1.004 times starting phi)
+
+       Lambda =   1.1604     ----->
+          Phi =  4.83042E-05  (  1.004 times starting phi)
+
+   No more lambdas: relative phi reduction between lambdas less than 0.0300
+   Lowest phi this iteration:  4.83042E-05
+
+      Current parameter values                 Previous parameter values
+      hk_2             71.1907                 hk_2              71.1782    
+   Maximum   factor change:  1.000     ["hk_2"]
+   Maximum relative change: 1.7572E-04 ["hk_2"]
+
+
+OPTIMISATION ITERATION NO.        : 4
+   Model calls so far             : 12
+   Starting phi for this iteration:  4.83042E-05
+
+       Lambda =   1.1604     ----->
+          Phi =  4.84373E-05  (  1.003 times starting phi)
+
+       Lambda =  0.58020     ----->
+          Phi =  4.84373E-05  (  1.003 times starting phi)
+
+   No more lambdas: relative phi reduction between lambdas less than 0.0300
+   Lowest phi this iteration:  4.84373E-05
+
+      Current parameter values                 Previous parameter values
+      hk_2             71.1981                 hk_2              71.1907    
+   Maximum   factor change:  1.000     ["hk_2"]
+   Maximum relative change: 1.0368E-04 ["hk_2"]
+
+
+OPTIMISATION ITERATION NO.        : 5
+   Model calls so far             : 16
+   Starting phi for this iteration:  4.84373E-05
+
+       Lambda =  0.58020     ----->
+          Phi =  4.83546E-05  (  0.998 of starting phi)
+
+       Lambda =  0.29010     ----->
+          Phi =  4.83546E-05  (  0.998 of starting phi)
+
+   No more lambdas: relative phi reduction between lambdas less than 0.0300
+   Lowest phi this iteration:  4.83546E-05
+
+      Current parameter values                 Previous parameter values
+      hk_2             71.1944                 hk_2              71.1981    
+   Maximum   factor change:  1.000     ["hk_2"]
+   Maximum relative change: 5.1838E-05 ["hk_2"]
+
+   Optimisation complete: relative parameter change less than 5.0000E-03
+                          over  4 successive iterations.
+   Total model calls:     20
+
+   The model has been run one final time using best parameters. 
+   Thus all model input files contain best parameter values, and model 
+   output files contain model results based on these parameters.
+
+
+                            OPTIMISATION RESULTS
+
+
+Parameters ----->
+
+Parameter        Estimated         95% percent confidence limits
+                 value             lower limit       upper limit
+ hk_2            71.1782            69.8864           72.4940    
+
+Note: confidence limits provide only an indication of parameter uncertainty.
+      They rely on a linearity assumption which  may not extend as far in 
+      parameter space as the confidence limits themselves - see PEST manual.
+
+See file e:\projects\delawaresgd\work\newtest\newtest.sen for parameter sensitivities.
+
+
+Observations ----->
+
+Observation            Measured       Calculated     Residual       Weight     Group
+                       value          value
+flux_0                0.227180       0.226790       3.900000E-04    10.00      heads       
+flux_1                0.123860       0.123630       2.300000E-04    10.00      heads       
+flux_2                7.409100E-02   7.393400E-02   1.570000E-04    10.00      heads       
+flux_3                4.831200E-02   4.819400E-02   1.180000E-04    10.00      heads       
+flux_4                3.440900E-02   3.431400E-02   9.500000E-05    10.00      heads       
+flux_5                2.671200E-02   2.663200E-02   8.000000E-05    10.00      heads       
+flux_6                2.188200E-02   2.181700E-02   6.500000E-05    10.00      heads       
+flux_7                1.895900E-02   1.892500E-02   3.400000E-05    10.00      heads       
+flux_8                1.717500E-02   1.716300E-02   1.200000E-05    10.00      heads       
+flux_9                1.598400E-02   1.598700E-02  -3.000000E-06    10.00      heads       
+flux_10               1.513900E-02   1.514700E-02  -8.000000E-06    10.00      heads       
+flux_11               1.459700E-02   1.459900E-02  -2.000000E-06    10.00      heads       
+flux_12               1.413800E-02   1.414700E-02  -9.000000E-06    10.00      heads       
+flux_13               1.374200E-02   1.375800E-02  -1.600000E-05    10.00      heads       
+flux_14               1.339500E-02   1.341800E-02  -2.300000E-05    10.00      heads       
+flux_15               1.308300E-02   1.311300E-02  -3.000000E-05    10.00      heads       
+flux_16               1.279900E-02   1.283700E-02  -3.800000E-05    10.00      heads       
+flux_17               1.253700E-02   1.258300E-02  -4.600000E-05    10.00      heads       
+flux_18               1.229500E-02   1.234900E-02  -5.400000E-05    10.00      heads       
+flux_19               1.207000E-02   1.213000E-02  -6.000000E-05    10.00      heads       
+flux_20               1.186000E-02   1.192700E-02  -6.700000E-05    10.00      heads       
+flux_21               1.166600E-02   1.173800E-02  -7.200000E-05    10.00      heads       
+flux_22               1.148500E-02   1.156300E-02  -7.800000E-05    10.00      heads       
+flux_23               1.131700E-02   1.139900E-02  -8.200000E-05    10.00      heads       
+flux_24               1.116100E-02   1.124800E-02  -8.700000E-05    10.00      heads       
+flux_25               1.101600E-02   1.110800E-02  -9.200000E-05    10.00      heads       
+flux_26               1.088200E-02   1.097900E-02  -9.700000E-05    10.00      heads       
+flux_27               1.076000E-02   1.086100E-02  -1.010000E-04    10.00      heads       
+flux_28               1.064900E-02   1.075300E-02  -1.040000E-04    10.00      heads       
+flux_29               1.054900E-02   1.065500E-02  -1.060000E-04    10.00      heads       
+flux_30               1.045800E-02   1.056700E-02  -1.090000E-04    10.00      heads       
+flux_31               1.037800E-02   1.048800E-02  -1.100000E-04    10.00      heads       
+flux_32               1.030800E-02   1.041900E-02  -1.110000E-04    10.00      heads       
+flux_33               1.024700E-02   1.035900E-02  -1.120000E-04    10.00      heads       
+flux_34               1.019500E-02   1.030700E-02  -1.120000E-04    10.00      heads       
+flux_35               1.015200E-02   1.026500E-02  -1.130000E-04    10.00      heads       
+flux_36               1.011800E-02   1.023100E-02  -1.130000E-04    10.00      heads       
+flux_37               1.009300E-02   1.020500E-02  -1.120000E-04    10.00      heads       
+flux_38               1.007600E-02   1.018800E-02  -1.120000E-04    10.00      heads       
+flux_39               1.006800E-02   1.018000E-02  -1.120000E-04    10.00      heads       
+
+See file e:\projects\delawaresgd\work\newtest\newtest.res for more details of residuals in graph-ready format.
+
+See file e:\projects\delawaresgd\work\newtest\newtest.seo for composite observation sensitivities.
+
+
+Objective function ----->
+
+  Sum of squared weighted residuals (ie phi)                =  4.8118E-05
+
+
+Correlation Coefficient ----->
+
+  Correlation coefficient                                   =   1.000    
+
+
+Analysis of residuals ----->
+
+  All residuals:-
+     Number of residuals with non-zero weight                       =    40
+     Mean value of non-zero weighted residuals                      = -2.7750E-04
+     Maximum weighted residual [observation "flux_0"]               =  3.9000E-03
+     Minimum weighted residual [observation "flux_35"]              = -1.1300E-03
+     Standard variance of weighted residuals                        =  1.2338E-06
+     Standard error of weighted residuals                           =  1.1108E-03
+
+     Note: the above variance was obtained by dividing the objective 
+     function by the number of system degrees of freedom (ie. number of 
+     observations with non-zero weight plus number of prior information 
+     articles with non-zero weight minus the number of adjustable parameters.)
+     If the degrees of freedom is negative the divisor becomes 
+     the number of observations with non-zero weight plus the number of 
+     prior information items with non-zero weight.
+
+
+K-L information statistics ----->
+
+
+  AIC   =  -541.2295    
+  AICC  =  -540.9052    
+  BIC   =  -537.8518    
+  KIC   =  -535.9648    
+
+Parameter covariance matrix ----->
+
+                 hk_2    
+hk_2           1.5460E-05
+
+
+Parameter correlation coefficient matrix ----->
+
+                 hk_2    
+hk_2            1.000    
+
+
+Normalized eigenvectors of parameter covariance matrix ----->
+
+              Vector_1   
+hk_2            1.000    
+
+
+Eigenvalues ----->
+
+               1.5460E-05

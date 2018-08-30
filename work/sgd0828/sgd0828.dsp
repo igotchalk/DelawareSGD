@@ -1,0 +1,43 @@
+         0         3                           -1 #al layer 1
+         0         3                           -1 #al layer 2
+         0         3                           -1 #al layer 3
+         0         3                           -1 #al layer 4
+         0         3                           -1 #al layer 5
+         0         3                           -1 #al layer 6
+         0         3                           -1 #al layer 7
+         0         3                           -1 #al layer 8
+         0         3                           -1 #al layer 9
+         0         3                           -1 #al layer 10
+         0         3                           -1 #al layer 11
+         0         3                           -1 #al layer 12
+         0         3                           -1 #al layer 13
+         0         3                           -1 #al layer 14
+         0         3                           -1 #al layer 15
+         0         3                           -1 #al layer 16
+         0         3                           -1 #al layer 17
+         0         3                           -1 #al layer 18
+         0         3                           -1 #al layer 19
+         0         3                           -1 #al layer 20
+         0         3                           -1 #al layer 21
+         0         3                           -1 #al layer 22
+         0         3                           -1 #al layer 23
+         0         3                           -1 #al layer 24
+         0         3                           -1 #al layer 25
+         0         3                           -1 #al layer 26
+         0         3                           -1 #al layer 27
+         0         3                           -1 #al layer 28
+         0         3                           -1 #al layer 29
+         0         3                           -1 #al layer 30
+         0         3                           -1 #al layer 31
+         0         3                           -1 #al layer 32
+         0         3                           -1 #al layer 33
+         0         3                           -1 #al layer 34
+         0         3                           -1 #al layer 35
+         0         3                           -1 #al layer 36
+         0         3                           -1 #al layer 37
+         0         3                           -1 #al layer 38
+         0         3                           -1 #al layer 39
+         0         3                           -1 #al layer 40
+         0         1                           -1 #trpt
+         0         1                           -1 #trpv
+         0         0                           -1 #dmcoef1

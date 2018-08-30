@@ -10,6 +10,7 @@ ADV               32  newtest.adv
 DSP               33  newtest.dsp 
 GCG               35  newtest.gcg 
 SSM               34  newtest.ssm 
+CHD               24  newtest.chd 
 VDF               37  newtest.vdf 
 DATA(BINARY)      53  newtest.cbc REPLACE
 DATA(BINARY)      51  newtest.hds REPLACE

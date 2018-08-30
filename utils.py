@@ -79,16 +79,43 @@ def get_ocean_outflow_chd(m,ocean_bool):
     ocean_outflow[np.where(ocean_bool==1)] = flx
     return ocean_outflow
 
+def get_salt_outflow(m,kstpkper=None,totim=None):
+    fname = os.path.join(m.model_ws, 'MT3D001.UCN')
+    ucnobj = flopy.utils.binaryfile.UcnFile(fname)
+    totim = ucnobj.get_times()[-1]
+    if kstpkper==None:
+        kstpkper = ucnobj.get_kstpkper()[-1]
+    ocean_conc = ucnobj.get_data(kstpkper=kstpkper)
+    return ocean_conc
+    
 def plot_background(mm,array,label=None):
     if label==None:
-        label = 'array'
-    cpatchcollection = mm.plot_array(array,cmap='jet')
+        label = [ k for k,v in globals().items() if v is array][-1]
+    print('label: ',label)
+    if label=='hk':
+        norm=matplotlib.colors.LogNorm()
+        vmin=hkClay
+        vmax=hkSand
+        cmap='jet'
+    else:
+        norm = None
+        vmin=None
+        vmax=None
+        cmap='jet'
+    cpatchcollection = mm.plot_array(array,cmap=cmap,norm=norm,vmin=vmin,vmax=vmax)
     cpatchcollection.set_label(label)
     return cpatchcollection,label
-
-def trypath(fun,path):
-    try:
-        res = fun(path)
-    except:
-        res = fun(r""+path)
-    return res
+    
+def read_ref(fname='ref_file.txt'):
+    import re
+    #Load ref file to get info about model
+    reffile = os.path.join('.',fname)
+    reftext = open(reffile, 'r').read()    
+    beg = [m.start() for m in re.finditer('<<<', reftext)]
+    betw = [m.start() for m in re.finditer('>>>', reftext)]
+    end = [m.start() for m in re.finditer('\n', reftext)]
+    d = {}
+    for i in range(len(beg)):
+        d[str(reftext[beg[i]+3:betw[i]])] =  reftext[betw[i]+3:end[i]] 
+    return d
+    #[exec(reftext[beg[i]+3:betw[i]]) for i in range(len(beg))]

@@ -21,27 +21,36 @@ modelname = sys.argv[1]
 #2 Create SEAWAT input files
 ################
 
+import SGD
 import SGD_writeSWinput
+print('Defining model and preparing Seawat files...')
 m, ocean_col = SGD_writeSWinput.write_swt_input(modelname)
-m.write_ref_file()
+m.write_ref_file(m.storage_dict)
+m.plot_hk_ibound()
 
 ################
 #3 Run SEAWAT model
 ################
 
+print('Model size: ' + '{:d}x{:d}x{:d} = {:d}'.format(m.nlay,m.nrow,m.ncol,m.nlay*m.nrow*m.ncol) + ' cells')
+print('Stress periods: ' + str(m.nper))
+print('Running model...')
 import SGD_readrun_model
 
 ################
 #4 Write .tpl , .ins , .pst
 ################
+print('Writing instruction file...')
 ins_data = m.write_ins()
-tpl_data = m.write_tpl()
-m.copy_output2obs()
-m.write_pst(tpl_data,ins_data)
-#import SGD_write_pest_files
-#ins_data = SGD_write_pest_files.write_ins(m)
-#tpl_data = SGD_write_pest_files.write_tpl(m)
-#SGD_write_pest_files.write_pst(m,tpl_data,ins_data)
 
-##Plot the initial K-field
-#SGD_writeSWinput.plot(m)
+print('Writing TPL file...')
+
+tpl_data = m.write_tpl()
+
+print('Copying output to observation file...')
+m.copy_output2obs()
+
+print('Writing control (PST) file..')
+m.write_pst(tpl_data,ins_data)
+
+print('...Done!')

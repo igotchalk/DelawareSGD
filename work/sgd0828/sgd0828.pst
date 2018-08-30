@@ -1,0 +1,62 @@
+pcf
+* control data
+restart estimation
+1 40 1 0 1
+1 1 double point
+10.000000 -3.000000 0.300000 0.030000 10
+10.0  10.0  0.001
+0.1
+30  0.005  4  4  0.005  4  1E-5
+1  1  1
+* parameter groups
+hk relative 0.01 0.0 switch 2.0 parabolic
+* parameter data
+hk_2 log factor 72.306908 1.000000e-03 1.000000e+03 hk 1.000000 0.000000 1
+* observation groups
+heads
+* observation data
+flux_0 0.232370 10.000000 heads
+flux_1 0.126280 10.000000 heads
+flux_2 0.075148 10.000000 heads
+flux_3 0.048651 10.000000 heads
+flux_4 0.034349 10.000000 heads
+flux_5 0.026410 10.000000 heads
+flux_6 0.021878 10.000000 heads
+flux_7 0.019197 10.000000 heads
+flux_8 0.017532 10.000000 heads
+flux_9 0.016432 10.000000 heads
+flux_10 0.015651 10.000000 heads
+flux_11 0.015057 10.000000 heads
+flux_12 0.014574 10.000000 heads
+flux_13 0.014164 10.000000 heads
+flux_14 0.013802 10.000000 heads
+flux_15 0.013477 10.000000 heads
+flux_16 0.013179 10.000000 heads
+flux_17 0.012905 10.000000 heads
+flux_18 0.012650 10.000000 heads
+flux_19 0.012414 10.000000 heads
+flux_20 0.012194 10.000000 heads
+flux_21 0.011989 10.000000 heads
+flux_22 0.011798 10.000000 heads
+flux_23 0.011620 10.000000 heads
+flux_24 0.011455 10.000000 heads
+flux_25 0.011303 10.000000 heads
+flux_26 0.011163 10.000000 heads
+flux_27 0.011035 10.000000 heads
+flux_28 0.010919 10.000000 heads
+flux_29 0.010814 10.000000 heads
+flux_30 0.010720 10.000000 heads
+flux_31 0.010637 10.000000 heads
+flux_32 0.010564 10.000000 heads
+flux_33 0.010500 10.000000 heads
+flux_34 0.010446 10.000000 heads
+flux_35 0.010401 10.000000 heads
+flux_36 0.010366 10.000000 heads
+flux_37 0.010339 10.000000 heads
+flux_38 0.010322 10.000000 heads
+flux_39 0.010313 10.000000 heads
+* model command line
+SGD_runmodel.bat
+* model input/output
+/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/sgd0828/sgd0828.lpf.tpl /Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/sgd0828/sgd0828.lpf
+/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/sgd0828/flux.ins /Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/sgd0828/flux.smp

@@ -1,3 +1,7 @@
+<<<ocean_bool>>>E:/Projects/DelawareSGD/ocean_bool.npy
+<<<head_inland>>>20.099
 <<<model_ws>>>E:/Projects/DelawareSGD/work/newtest
+<<<ocean_col>>>[30, 70]
 <<<modelname>>>newtest
-<<<ocean_col>>>[30, 69]
+<<<ocean_shead>>>[20.0, 19.5]
+<<<start_fresh_yn>>>1

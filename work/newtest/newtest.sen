@@ -1,0 +1,36 @@
+    PARAMETER SENSITIVITIES: CASE e:\projects\delawaresgd\work\newtest\newtest
+
+
+ OPTIMISATION ITERATION NO.  1 ----->
+ Parameter name    Group          Current value    Sensitivity
+   hk_2            hk               72.2693         7.223615E-03
+
+
+ OPTIMISATION ITERATION NO.  2 ----->
+ Parameter name    Group          Current value    Sensitivity
+   hk_2            hk               71.2034         7.062555E-03
+
+
+ OPTIMISATION ITERATION NO.  3 ----->
+ Parameter name    Group          Current value    Sensitivity
+   hk_2            hk               71.1782         7.100895E-03
+
+
+ OPTIMISATION ITERATION NO.  4 ----->
+ Parameter name    Group          Current value    Sensitivity
+   hk_2            hk               71.1907         7.111867E-03
+
+
+ OPTIMISATION ITERATION NO.  5 ----->
+ Parameter name    Group          Current value    Sensitivity
+   hk_2            hk               71.1981         7.066747E-03
+
+
+
+                        COMPLETION OF OPTIMISATION PROCESS
+
+ Composite sensitivities for all observations/prior info ----->
+
+ Number of observations with non-zero weight =    40
+ Parameter name    Group          Current value    Sensitivity
+   hk_2            hk               71.1782         7.062555E-03

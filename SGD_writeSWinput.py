@@ -31,28 +31,30 @@ def write_swt_input(modelname):
         cols = [int(find_nearest((np.arange(ncol)*delc),loc)) for loc in locs]
         return cols
 
-            
+    #Model grid
+    #Grid: 0.5 *1*1m • Size:70m*20m
     Lx = 70.
     Lz = 20.
+    Ly = 10
     nlay = 40
-    nrow = 1
+    nrow = 3
     ncol = 70
     delr = Lx / ncol
-    delc = 1.0
+    delc = Ly / nrow
     delv = Lz / nlay
     henry_top = Lz
     henry_botm = np.linspace(henry_top - delv, 0., nlay)
 
     #Period data
-    nper = 1
-    perlen = [100]
-    nstp = [100]
-    steady = [True]
+    perlen = [1,100]
+    nstp = [100,100]
+    nper = len(perlen)
+    steady = [True,False]
     itmuni = 4 #time unit 4= days
-    lenuni = 2 #length unit 2= meter
+    lenuni = 2 #length unit 2 = meter
     tsmult = 1
     ssm_data = None
-    verbose=True
+    verbose = True
 
 
     # In[4]:
@@ -119,18 +121,11 @@ def write_swt_input(modelname):
     # In[7]:
 
     #BCs
-    calc_inland_head = 0 #don't calculate from hgrad
+    calc_inland_head = 1 #don't calculate from hgrad
     manual_inland_head = Lz + .1
-    ocean_head = Lz
-    start_fresh_yn = 0
-
-    def calc_head_inland(calc_head_yn,manual=1):
-        if calc_head_yn==1:
-            head_inland = ocean_loc[0]*hgrad #calculate inland head from measured head gradient
-        else:
-            head_inland = manual
-        return head_inland
-
+    ocean_shead = [Lz,Lz-.5]
+    ocean_ehead = ocean_shead
+    start_fresh_yn = 1
 
     # save cell fluxes to unit 53
     ipakcb = 53
@@ -138,25 +133,30 @@ def write_swt_input(modelname):
     #MODFLOW BCs
     hgrad = 0.0033 #hydraulic gradient, m/m
     qinflow = 0  #influent FW m3/day
-    head_inland = calc_head_inland(calc_inland_head,manual_inland_head)
 
     #Create ocean boundary at top of model
     ocean_loc = [30,70] # location of ocean [start,end] in m
     ocean_col = [int(find_nearest((np.arange(ncol)*delc),loc)) for loc in ocean_loc]
     ocean_col_vec = (0,0,np.arange(ocean_col[0],ocean_col[1]+1))
+    ocean_coords = (0,slice(0,nrow),slice(ocean_col[0],ocean_col[1]+1)) #top of the model
     ocean_bool = np.zeros((nlay,nrow,ncol), dtype=bool)
-    ocean_bool[ocean_col_vec] = 1
-    ocean_coords = (0,0,slice(ocean_col[0],ocean_col[1]+1)) #top of the model
+    ocean_bool[0,:,np.arange(ocean_col[0],ocean_col[1])] = True
+    m.ocean_bool = ocean_bool
+    m.ocean_arr = ocean_bool
 
+    if calc_inland_head ==1:
+        head_inland = ocean_loc[0]*hgrad + Lz
+    else:
+        head_inland = manual_inland_head
     #Set ibound
     ibound = np.ones((nlay, nrow, ncol), dtype=np.int32)
     ibound[:, :, 0] = -1 #first column (FW boundary) has fixed head
-    ibound[ocean_col_vec] = -1
-    ibound[0:2,0,ocean_col[0]-3:ocean_col[0]] = 0
+    ibound[ocean_bool] = -1
+    ibound[0:2,:,ocean_col[0]-3:ocean_col[0]] = 0
 
     #Set starting heads
     strt = head_inland*np.ones((nlay, nrow, ncol)) #starting heads (for fixed head BC, this is will assign the head)
-    strt[ocean_col_vec] = ocean_head #head of ocean boundary
+    strt[ocean_bool] = ocean_shead[0] #head of ocean boundary
 
     #Transport BCs
     if start_fresh_yn == 1:
@@ -164,15 +164,23 @@ def write_swt_input(modelname):
     elif start_fresh_yn == 0:
         sconc = Csalt*np.ones((nlay, nrow, ncol), dtype=np.float32) #Begin SW-saturated
 
-    sconc[ocean_col_vec] = Csalt
-    sconc[:,0,0] = Cfresh
+    sconc[ocean_bool] = Csalt
+    sconc[:,:,0] = Cfresh
 
     icbund = np.ones((nlay, nrow, ncol), dtype=np.int) 
     icbund[(ibound < 0)] = -1 #constant concentration cells where also constant head
 
+    #Constant head boundary
+    stress_period_data = {}
+    ocean_sub = np.where(ocean_bool)
+    for i in range(nper):
+        dat = []
+        for j in range(np.sum(ocean_bool)):
+            dat.append([ocean_sub[0][j],ocean_sub[1][j],ocean_sub[2][j],ocean_shead[i],ocean_ehead[i]])
+        stress_period_data[i] = dat
+
 
     #Create instances in flopy
-
     bas = flopy.modflow.ModflowBas(m, ibound, strt=strt)
 
     # Add LPF package to the MODFLOW model
@@ -197,6 +205,7 @@ def write_swt_input(modelname):
     dsp = flopy.mt3d.Mt3dDsp(m, al=al, trpt=1., trpv=1., dmcoef=dmcoef)
     gcg = flopy.mt3d.Mt3dGcg(m, iter1=500, mxiter=1, isolve=1, cclose=1e-7)
     ssm = flopy.mt3d.Mt3dSsm(m, stress_period_data=ssm_data)
+    chd = flopy.modflow.ModflowChd(m, stress_period_data=stress_period_data)
 
     #vdf = flopy.seawat.SeawatVdf(m, iwtable=0, densemin=0, densemax=0,denseref=1000., denseslp=0.7143, firstdt=1e-3)
     vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=0, 
@@ -205,12 +214,14 @@ def write_swt_input(modelname):
     m.write_input()
     #Create a storage dictionary to pass to SGD model
     storage_dict = {'ocean_col': ocean_col,
+    'model_ws':m.model_ws,
+    'modelname':m.name,
     'ocean_bool': ocean_bool,
     'head_inland': head_inland,
-    'ocean_head': ocean_head,
+    'ocean_shead': ocean_shead,
     'start_fresh_yn': start_fresh_yn
     }
-
+    m.ocean_bool = ocean_bool
     m.set_ocean_arr(ocean_col_vec)
     m.set_storage_dict(storage_dict)
     return m, ocean_col
@@ -219,31 +230,3 @@ def get_model():
     fname = os.path.join(model_ws,modelname + '.nam')
     m = flopy.seawat.Seawat.load(fname,exe_name = sw_exe, model_ws = model_ws)
     return m
-def plot(m):
-    import matplotlib.pyplot as plt
-    import matplotlib.colors
-    import numpy as np
-    # Make plot of the grid
-    f = plt.figure(figsize=(15, 5))
-    plt.clf()
-    ax = f.add_subplot(1, 1, 1)
-    mm = flopy.plot.ModelCrossSection(ax=ax, model=m, line={'row':0});
-
-    lpf = m.get_package('lpf')
-    hk = lpf.hk.array
-    hkpatchcollection = mm.plot_array(hk, norm=matplotlib.colors.LogNorm(),vmin=np.min(hk), vmax=np.max(hk));
-    linecollectdsion = mm.plot_grid();
-    patchcollection = mm.plot_ibound();
-    cb = plt.colorbar(patchcollection);
-    cb.set_label('Boundary condition',rotation=90)
-
-    cb.set_ticks((1.5,2.5))
-    #cb.set_ticklabels(('No flow','Const head'))
-    cb.ax.set_yticklabels(('No flow','Const head'),rotation=90)
-
-
-    cb2 = plt.colorbar(hkpatchcollection,ax=ax);
-    cb2.set_label('Kh (m/d)', rotation=90)
-    plt.title('K-field & Boundary conditions');
-    plt.show()
-    return
