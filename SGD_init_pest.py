@@ -26,7 +26,10 @@ import SGD_writeSWinput
 print('Defining model and preparing Seawat files...')
 m, ocean_col = SGD_writeSWinput.write_swt_input(modelname)
 m.write_ref_file(m.storage_dict)
+<<<<<<< HEAD
 m.plot_hk_ibound()
+=======
+>>>>>>> 193c2bd82e3f8606ec55c4e108b3fda97dfdd6b5
 
 ################
 #3 Run SEAWAT model
