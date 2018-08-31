@@ -3,7 +3,6 @@ from pathlib import Path,PureWindowsPath
 import numpy as np
 import flopy
 from flopy.seawat import Seawat
-import sys
 import utils
 
 #Subclass of flopy.seawat.Seawat
@@ -48,7 +47,8 @@ class ModelSGD(Seawat):
         fout.write('Values are zero-based \n')
         fout.write('{:14s} {:4s} {:4s} {:4s} \n'.format("flux", "lay","row", "col"))
         for i in range(ocean_outflow.size):
-            fout.write('{:14.4e} {:4d} {:4d} {:4d}\n'.format(ocean_outflow[i],ocean_sub[0][i],ocean_sub[1][i],ocean_sub[2][i]))
+            fout.write('{:14.4e} {:4d} {:4d} {:4d}\n'.format(ocean_outflow[i],ocean_sub[0]
+                       [i],ocean_sub[1][i],ocean_sub[2][i]))
         fout.close()
         print('output FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
         return
@@ -56,7 +56,6 @@ class ModelSGD(Seawat):
     #Copy the output file to create a synthetic observation file
     def copy_output2obs(self,suffix='.smp'):
         import shutil
-        
         def get_fname(model_ws,ext):
             fname = [os.path.join(model_ws,f) for f in os.listdir(model_ws) if f.endswith(ext)][0];
             return fname
@@ -109,7 +108,8 @@ class ModelSGD(Seawat):
         # Write the template file
         tw = flopy.pest.templatewriter.TemplateWriter(self, plist)
         tw.write_template()
-        print('.tpl FILE WRITTEN: ' + os.path.join(self.model_ws, self.name +'.' + mfpackage + '.tpl'))
+        print('.tpl FILE WRITTEN: ' + os.path.join(self.model_ws, self.name
+                                                   +'.' + mfpackage + '.tpl'))
         npar = len(parzones)
         return tpl_data
     
@@ -206,8 +206,6 @@ class ModelSGD(Seawat):
         f.write('{:s}\n'.format(obgnme))
         
         #observation data
-        import pandas
-        
         def get_fname(model_ws,ext):
             fname = [os.path.join(model_ws,f) for f in os.listdir(model_ws) if f.endswith(ext)][0];
             return fname
@@ -270,7 +268,8 @@ class ModelSGD(Seawat):
             pass
         np.save(d['ocean_bool'], self.ocean_bool)
         #write the ocean_bool csv
-        fname = Path(os.path.abspath(os.path.join(self.model_ws,'..','..','ref_file.txt'))).as_posix()
+        fname = Path(os.path.abspath(os.path.join(self.model_ws
+                                                  ,'..','..','ref_file.txt'))).as_posix()
         fo = open(str(fname), "w")
         for k, v in d.items():
             fo.write('<<<' + str(k) + '>>>'+ str(v) + '\n')
