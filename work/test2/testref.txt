@@ -1,2 +1,0 @@
-modelname>>>test2
-model_ws>>>E:\Projects\DelawareSGD\work\test2

@@ -8,14 +8,15 @@ import utils
 #Subclass of flopy.seawat.Seawat
 #    Carries relevant info about the ocean boundary and other info
 class ModelSGD(Seawat):
-    def __init__(self,ocean_arr = None,storage_dict=None, ocean_col=[30,69],ocean_bool=None):
+    def __init__(self,ocean_arr = None,storage_dict=None, ocean_col=[30,69],ocean_bool=None,MC_file=None):
         super(Seawat, self).__init__()  #inherit Seawat properties
-        
+
         #Set other properties
         self.ocean_bool = ocean_bool
         self.ocean_arr = ocean_arr
         self.storage_dict = storage_dict
         self.ocean_col = ocean_col
+        self.MC_file = MC_file
         print("made an SGD model!")
     #Take a Seawat object and turn it into an SGD object
     @classmethod
@@ -52,7 +53,7 @@ class ModelSGD(Seawat):
         fout.close()
         print('output FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
         return
-    
+
     #Copy the output file to create a synthetic observation file
     def copy_output2obs(self,suffix='.smp'):
         import shutil
@@ -63,7 +64,7 @@ class ModelSGD(Seawat):
         f_obs = f_output[:-4] + '.obs'
         shutil.copy2(f_output,f_obs)
         print('observation file copied from: ' + f_output + '\nTo: ' + f_obs)
-        
+
     #Write instruction file
     def write_ins(self,fname = 'flux.ins',obs_name = 'flux'):
         #Get flux at ocean boundary so you know how many lines to write
@@ -87,7 +88,7 @@ class ModelSGD(Seawat):
         nobs = len(ocean_outflow)
         ins_data = [obs_name,nobs,ocean_outflow]
         return ins_data
-    
+
     #Make template file
     def write_tpl(self,zonearray=None, parzones=None,lbound=0.001,
                   ubound=1000.,transform='log'):
@@ -100,7 +101,7 @@ class ModelSGD(Seawat):
             parzones = [2]  #make zone #2 the zone to be parameterized
         lpf = self.get_package(mfpackage)
         parvals = [np.mean(lpf.hk.array)]
-        
+
         plist = flopy.pest.zonearray2params(mfpackage, partype, parzones, lbound,
                                               ubound, parvals, transform, zonearray)
         tpl_data = [mfpackage, partype, parzones, lbound,
@@ -112,7 +113,7 @@ class ModelSGD(Seawat):
                                                    +'.' + mfpackage + '.tpl'))
         npar = len(parzones)
         return tpl_data
-    
+
     def write_pst(self,tpl_data,ins_data):
         import pandas
 
@@ -168,7 +169,7 @@ class ModelSGD(Seawat):
         LSQRMODE
         LSQR_ATOL LSQR_BTOL LSQR_CONLIM LSQR_ITNLIM
         LSQRWRITE
-        '''   
+        '''
         #f.write('* lsqr\n')
 
         #parameter groups
@@ -180,7 +181,7 @@ class ModelSGD(Seawat):
 
         #parameter data
         '''
-        PARNME PARTRANS PARCHGLIM PARVAL1 PARLBND PARUBND PARGP SCALE OFFSET DERCOM 
+        PARNME PARTRANS PARCHGLIM PARVAL1 PARLBND PARUBND PARGP SCALE OFFSET DERCOM
         '''
         parname = tpl_data[1] + '_' + str(tpl_data[2][0])
         partrans = 'log'
@@ -204,19 +205,19 @@ class ModelSGD(Seawat):
         obgnme = 'heads'
         f.write('* observation groups\n')
         f.write('{:s}\n'.format(obgnme))
-        
+
         #observation data
         def get_fname(model_ws,ext):
             fname = [os.path.join(model_ws,f) for f in os.listdir(model_ws) if f.endswith(ext)][0];
             return fname
-        
+
         #"True" observations: should be same format as the .ins file and the .pts file
         fname_obs = get_fname(self.model_ws,'.obs')
         obs_array = pandas.read_csv(fname_obs,delim_whitespace=True,skiprows=1)
         obsval = obs_array.loc[:,'flux']
         weight = 10
 
-        f.write('* observation data\n')    
+        f.write('* observation data\n')
         for i in range(nobs):
             obsname = ins_data[0] + '_' + str(i)
             f.write('{:s} {:f} {:f} {:s}\n'.format(obsname,obsval[i],weight,obgnme))
@@ -245,7 +246,7 @@ class ModelSGD(Seawat):
         f.close()
         print('.pst FILE WRITTEN: ' + os.path.join(self.model_ws, fname))
         return
-        
+
     def write_ref_file(self,d=None,ocean_bool_npy=None):
         from pathlib import Path
         if d!=None:
@@ -277,7 +278,7 @@ class ModelSGD(Seawat):
         print('reference FILE WRITTEN: ' + fname)
         return
 
-    def plot_hk_ibound(self,rowslice=0):
+    def plot_hk_ibound(self,rowslice=0,gridon=1,printyn=0,dpi=200):
         import matplotlib.pyplot as plt
         import matplotlib.colors
         import numpy as np
@@ -289,16 +290,36 @@ class ModelSGD(Seawat):
         ax = f.add_subplot(1, 1, 1)
         mm = flopy.plot.ModelCrossSection(ax=ax, model=self, line={'row':rowslice});
         hkpatchcollection = mm.plot_array(hk, norm=matplotlib.colors.LogNorm(),
-                                          vmin=np.min(hk), vmax=np.max(hk),cmap='jet');
-        linecollectdsion = mm.plot_grid();
+                                          vmin=np.min(hk), vmax=np.max(hk),cmap='Greys');
+        if gridon==1:
+            linecollection = mm.plot_grid();
         patchcollection = mm.plot_ibound(color_ch='orange');
-        cb = plt.colorbar(patchcollection);
-        cb.set_label('Boundary condition',rotation=90)
-        cb.set_ticks((1.5,2.5))
-        #cb.set_ticklabels(('No flow','Const head'))
-        cb.ax.set_yticklabels(('No flow','Const head'),rotation=90)
+        try:
+            patchcollection2 = mm.plot_bc(ftype='GHB')
+        except:
+            pass
+        try:
+            patchcollection3 = mm.plot_bc(ftype='WEL')
+        except:
+            pass
+        try:
+            patchcollection4 = mm.plot_bc(ftype='CHD')
+        except:
+            pass
+        plt.ylabel('Elevation (m)')
+        plt.xlabel('Distance (m)')
+        if patchcollection:
+            cb = plt.colorbar(patchcollection);
+            cb.set_label('Boundary condition',rotation=90)
+            cb.set_ticks((1.5,2.5))
+            #cb.set_ticklabels(('No flow','Const head'))
+            cb.ax.set_yticklabels(('No flow','Const head'),rotation=90)
         cb2 = plt.colorbar(hkpatchcollection,ax=ax);
         cb2.set_label('Kh (m/d)', rotation=90)
         plt.title('K-field & Boundary conditions');
+        if printyn==1:
+            fname=os.path.join(self.model_ws, self.name + '_BC_Hk.png')
+            plt.savefig(fname,dpi=dpi)
+            print('Saved to ' + fname)
         plt.show()
         return
