@@ -16,7 +16,7 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 50
+tot_it = 10
 
 # run installed version of flopy or add local path
 try:
@@ -1284,37 +1284,14 @@ def check_MC_inputParams():
             m.inputParams = {}
     return
 
-
-# In[ ]:
-
-
 # ### Run the MC experiment:
-
-# In[83]:
-
 from scipy.io import savemat
 
-def run_MC(tot_it):
 
+def run_MC(tot_it):
     #### MAKE NEW/ADD TO OLD EXPT ####
     check_MC_inputParams()
-    '''
-    if m.MC_file is None:
-        create_MC_file()
-        m.inputParams = {}
-    else:
-        if m.inputParams is not None:
-            if len(m.inputParams)>0:
-                test = get_yn_response("m.inputParams already has entries, do you want to add to it?")
-                if test is True:
-                    pass
-                else: 
-                    m.inputParams = {}
-            else:
-                m.inputParams = {}
-        else:
-            m.inputParams = {}
-    '''
+    
     #### VARY PARAMS ####
     it = 0
     while it < tot_it:
@@ -1462,9 +1439,6 @@ def run_MC(tot_it):
 # In[84]:
 
 ####Run the MC experiment ####
-
-
-
 inputParams = run_MC(tot_it)
 
 ####Run the MC experiment ####

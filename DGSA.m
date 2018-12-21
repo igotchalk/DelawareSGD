@@ -16,7 +16,7 @@ end
 
 %load hausdorff matrix
 
-exptdir = 'E:\Projects\DelawareSGD\work\homogenous\MC_expt_2018-12-20-19-54';
+exptdir = '/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/homogenous/MC_expt_2018-12-20-23-41';
 f = 'hausdorff.mat';
 fname = fullfile(exptdir,f);
 load(fname)
