@@ -8,7 +8,8 @@ import utils
 #Subclass of flopy.seawat.Seawat
 #    Carries relevant info about the ocean boundary and other info
 class ModelSGD(Seawat):
-    def __init__(self,ocean_arr = None,storage_dict=None, ocean_col=[30,69],ocean_bool=None,MC_file=None):
+    def __init__(self,ocean_arr = None,storage_dict=None, ocean_col=[30,69],ocean_bool=None,
+                 MC_file=None,inputParams=None):
         super(Seawat, self).__init__()  #inherit Seawat properties
 
         #Set other properties
@@ -17,6 +18,7 @@ class ModelSGD(Seawat):
         self.storage_dict = storage_dict
         self.ocean_col = ocean_col
         self.MC_file = MC_file
+        self.inputParams = inputParams
         print("made an SGD model!")
     #Take a Seawat object and turn it into an SGD object
     @classmethod
@@ -294,10 +296,13 @@ class ModelSGD(Seawat):
         if gridon==1:
             linecollection = mm.plot_grid();
         patchcollection = mm.plot_ibound(color_ch='orange');
-        try:
-            patchcollection2 = mm.plot_bc(ftype='GHB')
-        except:
-            pass
+        itype = flopy.mt3d.Mt3dSsm.itype_dict()
+        for ftype in list(itype.keys()):
+            try:
+                mm.plot_bc(ftype=ftype)
+            except:
+                pass
+        '''
         try:
             patchcollection3 = mm.plot_bc(ftype='WEL')
         except:
@@ -306,6 +311,7 @@ class ModelSGD(Seawat):
             patchcollection4 = mm.plot_bc(ftype='CHD')
         except:
             pass
+        '''
         plt.ylabel('Elevation (m)')
         plt.xlabel('Distance (m)')
         if patchcollection:

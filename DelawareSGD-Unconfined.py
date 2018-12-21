@@ -6,14 +6,13 @@
 #
 #
 
-# In[1]:
+# In[144]:
 import os
 from pathlib import Path
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
-import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
@@ -47,7 +46,7 @@ print('Model workspace:', os.path.abspath(model_ws))
 # ### Utility functions
 #
 
-# In[2]:
+# In[145]:
 
 #nearest value in array
 def find_nearest(array,value):
@@ -180,12 +179,12 @@ def rand_clay_blocks(lithmat,hkClay,numblocks,sizeblocks):
     return lithmat_blocks
 
 
-# In[3]:
-
-80*40
+# In[ ]:
 
 
-# In[4]:
+
+
+# In[146]:
 
 #Model grid
 #Grid: 0.5 *1*1m • Size:70m*20m
@@ -231,6 +230,11 @@ offshore_elev = -beachslope*(ocean_col[1]-ocean_col[0])*delr
 #Period data
 perlen = [100,100,15000]
 nstp = [5,5,5]
+
+Lt = 360*20 #Length of time in days
+perlen = list(np.repeat(180,int(Lt/180)))
+nstp = list(np.ones(np.shape(perlen),dtype=int))
+
 nper = len(perlen)
 steady = [False for x in range(len(perlen))] #Never steady
 itmuni = 4 #time unit 4= days
@@ -240,14 +244,10 @@ ssm_data = None
 verbose = True
 
 
-# In[ ]:
+# In[147]:
 
-
-
-
-# In[ ]:
-
-
+#len = 40 yrs
+#stepsize = .5 year (180 days)
 
 
 # In[ ]:
@@ -255,7 +255,12 @@ verbose = True
 
 
 
-# In[5]:
+# In[ ]:
+
+
+
+
+# In[148]:
 
 #Create basic model instance and dis pacakge
 m = flopy.seawat.Seawat(modelname, exe_name=sw_exe, model_ws=model_ws,verbose=verbose)
@@ -276,7 +281,7 @@ dis = flopy.modflow.ModflowDis(m, nlay, nrow, ncol, nper=nper, delr=delr,
 
 
 
-# In[6]:
+# In[149]:
 
 #Hydraulic conductivity field
 hkSand = 80.  #horizontal hydraulic conductivity m/day
@@ -333,13 +338,39 @@ denseslp = (densesalt - densefresh) / (Csalt - Cfresh)
 
 
 
+# In[150]:
+
+def add_pumping_wells(wel_data,ssm_data,n_wells,flx,rowcol,kper):
+    itype = flopy.mt3d.Mt3dSsm.itype_dict()
+    new_weldata = wel_data
+    new_ssmdata = ssm_data
+    for k in range(n_wells):
+        row,col = rowcol[k]
+        for i in range(nper):
+            if i in kper:
+                for j in range(nlay):
+                    #WEL {stress_period: [lay,row,col,flux]}
+                    new_weldata[i].append([j,row,col,-flx[k]/(nlay)])
+                    #SSM: {stress_period: [lay,row,col,concentration,itype]}
+                    new_ssmdata[i].append([j,row,col,Cfresh,itype['WEL']]) #since it's a sink, conc. doesn't matter
+            else:
+                for j in range(nlay):
+                    #WEL {stress_period: [lay,row,col,flux]}
+                    new_weldata[i].append([j,row,col,0])
+                    #SSM: {stress_period: [lay,row,col,concentration,itype]}
+                    new_ssmdata[i].append([j,row,col,Cfresh,itype['WEL']]) #since it's a sink, conc. doesn't matter
+                continue
+    return new_weldata, new_ssmdata
+
+
 # In[ ]:
 
 
 
 
-# In[7]:
+# In[151]:
 
+'''
 def add_pumping_wells(wel_data,ssm_data,n_wells,flx_generator,rowcol,*args):
     itype = flopy.mt3d.Mt3dSsm.itype_dict()
     new_weldata = wel_data
@@ -356,6 +387,7 @@ def add_pumping_wells(wel_data,ssm_data,n_wells,flx_generator,rowcol,*args):
                     new_ssmdata[i].append([j,row,col,Cfresh,itype['WEL']]) #since it's a sink, conc. doesn't matter
     return new_weldata, new_ssmdata,flx
 
+'''
 #Add recharge if desired
 def make_rech_array(low=1e-2,high=1e0):
     import scipy.stats as sts
@@ -390,7 +422,7 @@ def write_sample(fname,varname,distclass,sample):
     return
 
 
-# In[8]:
+# In[152]:
 
 #BCs
 bc_ocean = 'GHB'
@@ -418,7 +450,6 @@ start_fresh_yn = 1
 ocean_shead = [ocean_elev for x in range(len(perlen))]
 ocean_ehead = ocean_shead
 ##dev
-
 
 # save cell fluxes to unit 53
 ipakcb = 53
@@ -600,24 +631,86 @@ wel_data_base,ssm_data_base = wel_data,ssm_data
 timprs = np.round(np.linspace(1,np.sum(perlen),20),decimals=0)
 
 
+
+# In[153]:
+
 #### ADD WELL AND RECHARRGE DATA####
-## 1) Add well data
-##wel_data: #well pumping (m/day)
-#      Uniform (1e-2,1e0)
-n_wells = 2
-rowcol = [(int(m.nrow/2),int(m.ncol/2)),
-         (int(m.nrow/3),int(m.ncol/3))]
-args = (sts.uniform,1,0,m,'wel',0,*(1e-2,1e0-1e-2))
-wel_data,ssm_data,flx = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,sample_dist,rowcol,*args)
+#Winter is even stress periods, summer is odd SP.
+#Winter= wells OFF, natural precip (rech) ON, irrigation rech OFF,
+#Summer = wells ON, irrigation rech (farm_rech) ON,  precip (rech) OFF
 
-## 2) Add recharge data
-args = tuple(np.log10((1e-6/(nrow*ncol),1e-3/(nrow*ncol))))
-args = (args[0],args[1]-args[0])
-rech_data = sample_dist(sts.uniform,1,0,m,'rech',1,*args)
+##Add recharge data
+rechargs = tuple(np.log10((1e-6/(nrow*ncol),1e-2/(nrow*ncol))))
+rechargs = (rechargs[0],rechargs[1]-rechargs[0])
+rech = sample_dist(sts.uniform,1,0,m,'rech',1,*rechargs)
+
+farm_rechargs = (rechargs[0],rechargs[1]) #note: this is in log space
+farm_rech_flux = sample_dist(sts.uniform,1,0,m,'rech',1,*farm_rechargs)
+
+farm_leftmargin = 5
+nfarms = 4
+farm_size = (200,200) #m in row,col direction
+farm_size_rowcol = (int(farm_size[0]/delc),int(farm_size[1]/delr)) #size of farm in number of row,col
+
+farm_loc_r = []
+farm_loc_c = []
+farm_orig = []
+for x in range(int(nfarms/2)):
+    for y in range(2):
+        for z1 in range(farm_size_rowcol[0]):
+            for z2 in range(farm_size_rowcol[1]):
+                farm_loc_r.append(int(nrow/2)-y*farm_size_rowcol[0] + z1)
+                farm_loc_c.append(farm_leftmargin + x*farm_size_rowcol[1] + z2)
+                if (z1==0) and (z2==0):
+                    farm_orig.append((farm_loc_r[-1],farm_loc_c[-1]))
+farm_loc = (np.array(farm_loc_r),np.array(farm_loc_c))
+farm_rech = np.zeros((nrow,ncol),dtype=np.float)
+farm_rech[farm_loc] = farm_rech_flux
+
+'''
+plt.imshow(farm_rech)
+plt.title('farm recharge locations')
+plt.xlabel('columns')
+plt.ylabel('rows')
+plt.colorbar()
+'''
+
+rech_data = {}
+for i in range(len(perlen)):
+    if i%2==0:
+        rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech
+    else:
+        rech_data[i] = farm_rech
+
+## Add well data
+n_wells = nfarms
+kper_odd = list(np.arange(1,nper,2))
+lowhigh = np.log10((1e1,1e2))
+
+wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
+wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
 
 
+# ### Notes on Farm fields
+# North Marina Area:
+# Fields can be as close as 400m from the coast!! Others closer to 1.7km
+#
+# Most fields are about 200x200m, some fields that appear to be row crops (strawberry? lettuce?) are 100x100 or so
+#
+# Fields are in a 3 distinct patches, each patch is almost completely covered with crops:
+#
+# -Near coast (400m+), verdant larger plots.
+#
+# -1.7km inland, pale colored, tight rows
+#
+# -2.75km inland, larger plots, varied color
+#
+#
+# Salinas Valley:
+# Most fields are about 200-250m wide minimum and can be 300-600m long
+#
 
-# In[10]:
+# In[154]:
 
 savehead = []
 oc_data = {}
@@ -635,7 +728,7 @@ print(oc_data)
 
 
 
-# In[11]:
+# In[155]:
 
 #Create instances in flopy
 bas = flopy.modflow.ModflowBas(m, ibound, strt=strt)
@@ -644,7 +737,7 @@ if bc_ocean=='CHD' or bc_inland=='CHD' :
 if bc_ocean=='GHB' or bc_inland=='GHB'or bc_right_edge=='GHB':
     ghb = flopy.modflow.ModflowGhb(m, stress_period_data=ghb_data)
 wel = flopy.modflow.ModflowWel(m, stress_period_data=wel_data, ipakcb=ipakcb)
-rch = flopy.modflow.ModflowRch(m, rech=rech_data, nrchop=1)
+rch = flopy.modflow.ModflowRch(m, rech=rech_data)
 
 # Add LPF package to the MODFLOW model
 lpf = flopy.modflow.ModflowLpf(m, hk=hk, vka=vka, ipakcb=ipakcb,laytyp=1)
@@ -682,15 +775,15 @@ vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1,
 
 
 
-# In[12]:
-
+# In[156]:
+'''
 printyn = 0
 gridon=0
-rowslice=rowcol[0][0]
+rowslice=farm_orig[1][0]
 m.plot_hk_ibound(rowslice=rowslice,printyn=printyn,gridon=gridon);
+'''
 
-
-# In[13]:
+# In[157]:
 
 #Write input
 m.write_input()
@@ -711,7 +804,7 @@ except:
 
 
 
-# In[14]:
+# In[158]:
 
 #Run model
 import datetime
@@ -723,7 +816,7 @@ for idx in range(-3, 0):
 
 # ## Post-processing results
 
-# In[15]:
+# In[159]:
 
 #Post-processing functions
 def plotdischarge(modelname,model_ws,color='w',per=-1,scale=50,rowslice=0):
@@ -771,6 +864,7 @@ def kstpkper_from_time(ucnobj,tottim):
     return kstpkper
 
 def kstpkper_ind_from_kstpkper(ucnobj,kstpkper=(0,0)):
+    kstpkpers = ucnobj.get_kstpkper()
     kstpkper_unique = permute_kstpkper(ucnobj)[0]
     kstpkper_ind = kstpkper_unique.index(kstpkper)
     return kstpkper_ind
@@ -815,7 +909,7 @@ def plot_mas(m):
     return mas
 
 
-# In[16]:
+# In[160]:
 
 # Extract final timestep heads
 fname = os.path.join(model_ws, '' + modelname + '.hds')
@@ -833,14 +927,27 @@ conc = ucnobj.get_data(totim=times[-1])
 conc[np.where(ibound != 1)] = np.nan
 
 
+# In[ ]:
 
 
-# In[17]:
 
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[166]:
+'''
 # Make head and quiver plot
 import utils
 printyn = 1
-rowslice = rowcol[0][0]
+rowslice = 5#farm_orig[0][0]
 per=-1
 f, axs = plt.subplots(2,1, sharex=True, figsize=(6, 4),
                      gridspec_kw = {'height_ratios':[1, 7]})
@@ -860,10 +967,11 @@ plt.clabel(CS, CS.levels, inline=True, fontsize=10)
 mm.plot_ibound()
 mm.plot_bc(ftype='WEL',color='white')
 #Plot discharge
-utils.plotdischarge(m,color='white',per=-1,scale=50,rowslice=rowslice,iskip=2);
+utils.plotdischarge(m,color='white',per=-1,scale=150,rowslice=rowslice,iskip=2);
 plt.xlabel('Distance (m)')
 plt.ylabel('Elevation (m)')
 plt.subplots_adjust(bottom=.1)
+'''
 
 '''
 #plot SGD
@@ -899,6 +1007,8 @@ axs02 = axs[0].twinx()
 #plt.plot(ocean_col_vec[2]+delc/2 , ocean_salt_outflow,'r.')
 #plt.ylabel('conc \nunderlying (g/L)',rotation=90)
 '''
+
+'''
 #align plots and set colorbar
 f.subplots_adjust(left=.1,right=0.88)
 cbar_ax = f.add_axes([0.90, 0.1, 0.02, 0.7])
@@ -908,11 +1018,11 @@ if printyn == 1:
     plt.savefig(os.path.join(m.model_ws, m.name + '_' + ts + '_flowvec_row' + str(rowslice) +
                              '_per' + str(per) + '_' + lbl[:3] + '.png'),dpi=150)
 plt.show()
+'''
 
+# In[162]:
 
-# In[19]:
-
-mas = plot_mas(m)
+#mas = plot_mas(m)
 
 
 # ## MC experiment
@@ -920,7 +1030,7 @@ mas = plot_mas(m)
 
 # ### MC functions
 
-# In[20]:
+# In[163]:
 
 import scipy.stats as sts
 
@@ -1024,51 +1134,204 @@ def reassign_m():
     return
 
 
+# In[203]:
 
-# In[21]:
+def get_yn_response(prompt):
+    while True:
+        try:
+            resp = str(input(prompt))
+        except ValueError:
+            print("Sorry, I didn't understand that.")
+            continue
+        if resp[0] is 'y':
+            value = True
+            break
+        elif resp[0] is 'n':
+            value = False
+            break
+        else:
+            print('This didnt work right. Try again')
+            continue
+    return value
+
+
+# In[220]:
+
+#### VARY PARAMS ####
+
+
+# In[215]:
+
+print(m.MC_file,m.inputParams)
+
+
+# In[181]:
+
+#create_MC_file()
+
+
+# ### Run the MC experiment:
+
+# In[222]:
 
 from scipy.io import savemat
 
-tot_it = 10
-it = 0
-inputParams = {}
-
-while it < tot_it:
-    it += 1
+tot_it = 20
+def run_MC(tot_it):
     #### VARY PARAMS ####
     if m.MC_file is None:
         create_MC_file()
+        m.inputParams = {}
+    else:
+        if m.inputParams is not None:
+            if len(m.inputParams)>0:
+                test = get_yn_response("m.inputParams already has entries, do you want to add to it?")
+                if test is True:
+                    pass
+                else:
+                    m.inputParams = {}
+            else:
+                m.inputParams = {}
+        else:
+            m.inputParams = {}
 
-    ##hk: hk
-    #      Uniform (1,100)
-    low= 1e-1
-    high = 100
-    parname='hk'
-    hk = sample_dist(sts.uniform,1,1,m,'hk',0,*(low,high-low))
-    add_to_paramdict(inputParams,parname,hk)
+    it = 0
+    while it < tot_it:
+        it += 1
+        ##hk: hk
+        #      Uniform (1,100)
+        low= 1e-1
+        high = 100
+        parname='hk'
+        hk = sample_dist(sts.uniform,1,1,m,'hk',0,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,hk)
 
-    ##vka: ratio of vk/hk
-    #      Uniform (1/20,1)
-    low= 1/20
-    high = 1
-    parname='vka'
-    vka = sample_dist(sts.uniform,1,1,m,'vka',0,*(low,high-low))
-    add_to_paramdict(inputParams,parname,vka)
+        ##vka: ratio of vk/hk
+        #      Uniform (1/20,1)
+        low= 1/20
+        high = 1
+        parname='vka'
+        vka = sample_dist(sts.uniform,1,1,m,'vka',0,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,vka)
 
-    ##al: #longitudinal dispersivity (m)
-    #      Uniform [0.1,20] #10 from Walther et al
-    low= 0.1
-    high = 20
-    parname='al'
-    al = sample_dist(sts.uniform,1,1,m,'al',0,*(low,high-low))
-    add_to_paramdict(inputParams,parname,al)
+        ##al: #longitudinal dispersivity (m)
+        #      Uniform [0.1,20] #10 from Walther et al
+        low= 0.1
+        high = 20
+        parname='al'
+        al = sample_dist(sts.uniform,1,1,m,'al',0,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,al)
 
-    ##dmcoef: #dispersion coefficient (m2/day)
-    #      log-uniform [1e-10,1e-5] #2e-9 from Walther et al
-    lowhigh = np.log10([1e-10,1e-5])
-    parname='dmcoef'
-    dmcoef = sample_dist(sts.uniform,1,1,m,'dmcoef',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
-    add_to_paramdict(inputParams,parname,dmcoef)
+        ##dmcoef: #dispersion coefficient (m2/day)
+        #      log-uniform [1e-10,1e-5] #2e-9 from Walther et al
+        lowhigh = np.log10([1e-10,1e-5])
+        parname='dmcoef'
+        dmcoef = sample_dist(sts.uniform,1,1,m,'dmcoef',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
+        add_to_paramdict(m.inputParams,parname,dmcoef)
+
+        #Add recharge data
+        rechargs = tuple(np.log10((1e-6/(nrow*ncol),1e-2/(nrow*ncol))))
+        rechargs = (rechargs[0],rechargs[1]-rechargs[0])
+        rech = sample_dist(sts.uniform,1,0,m,'rech',1,*rechargs)
+
+        farm_rechargs = (rechargs[0],rechargs[1]) #note: this is in log space
+        farm_rech_flux = sample_dist(sts.uniform,1,0,m,'rech',1,*farm_rechargs)
+        farm_rech[farm_loc] = farm_rech_flux
+        rech_data = {}
+        for i in range(len(perlen)):
+            if i%2==0:
+                rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech
+            else:
+                rech_data[i] = farm_rech
+        parname = 'rech'
+        add_to_paramdict(m.inputParams,parname,rech)
+        parname = 'farm_rech'
+        add_to_paramdict(m.inputParams,parname,farm_rech_flux)
+
+        # Add well data
+        lowhigh = np.log10((1e1,1e2))
+        wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
+        wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
+        parname = 'wel'
+        for i in range(n_wells):
+            parname_temp = parname+str(i)
+            add_to_paramdict(m.inputParams,parname_temp,wel_flux[i])
+
+        ###### Reassign, run record ######
+        #Reassign to model object
+        reassign_m()
+
+        #Write input
+        m.write_input()
+
+        # Try to delete the output files, to prevent accidental use of older files
+        try:
+            os.remove(os.path.join(model_ws,'MT3D.CNF'))
+            os.remove(os.path.join(model_ws,'MT3D001.MAS'))
+            os.remove(os.path.join(model_ws, modelname + '.hds'))
+        except:
+            pass
+
+        try:
+            os.remove(os.path.join(model_ws, 'MT3D001.UCN'))
+        except:
+            pass
+
+        try:
+            os.remove(os.path.join(model_ws, modelname + '.cbc'))
+        except:
+            pass
+
+
+        #Make timestamp
+        import datetime
+        sep = '-'
+        ts = datetime.datetime.now().strftime('%m'+sep+'%d'+sep+'%H'+sep+'%M'+sep+'%S')
+        ts_hms = ts.split(sep)[2:]
+        ts_hms = sep.join(ts_hms)
+
+        #Run model
+        v = m.run_model(silent=True, report=True)
+        for idx in range(-3, 0):
+            print(v[1][idx])
+
+
+        #Record final salinity as .npy, also move full CBC and UCN files to expt folder
+        _ = record_salinity(m,ts_hms=ts_hms);
+        copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
+        #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
+
+        print('Finished iteration ',it,'out of ',tot_it)
+    #Save inputParams immediately to prevent accidental destruction of them
+    savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),m.inputParams)
+    return m.inputParams
+
+
+# In[223]:
+
+####Run the MC experiment ####
+
+inputParams = run_MC(tot_it)
+
+####Run the MC experiment ####
+
+
+# In[ ]:
+
+
+
+
+# In[24]:
+
+'''
+    ## Add well data
+    parname = 'wel'
+    lowhigh = np.log10((1e1,1e2))
+    wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
+    wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
+    for i in range(n_wells):
+        parname_temp = parname+i
+        add_to_paramdict(inputParams,parname_temp,wel_flux[i])
 
     ##rech: surface recharge
     # log-uniform (1e-7,1e-3)
@@ -1089,69 +1352,13 @@ while it < tot_it:
     write_sample(m.MC_file,'wel',sts.uniform,flx)
     add_to_paramdict(inputParams,'wel1',flx[0])
     add_to_paramdict(inputParams,'wel2',flx[1])
-
-    ###### Reassign, run record ######
-    #Reassign to model object
-    reassign_m()
-
-    #Write input
-    m.write_input()
-
-    # Try to delete the output files, to prevent accidental use of older files
-    try:
-        os.remove(os.path.join(model_ws,'MT3D.CNF'))
-        os.remove(os.path.join(model_ws,'MT3D001.MAS'))
-        os.remove(os.path.join(model_ws, modelname + '.hds'))
-    except:
-        pass
-
-    try:
-        os.remove(os.path.join(model_ws, 'MT3D001.UCN'))
-    except:
-        pass
-
-    try:
-        os.remove(os.path.join(model_ws, modelname + '.cbc'))
-    except:
-        pass
-
-
-    #Make timestamp
-    import datetime
-    sep = '-'
-    ts = datetime.datetime.now().strftime('%m'+sep+'%d'+sep+'%H'+sep+'%M'+sep+'%S')
-    ts_hms = ts.split(sep)[2:]
-    ts_hms = sep.join(ts_hms)
-
-    #Run model
-    v = m.run_model(silent=True, report=True)
-    for idx in range(-3, 0):
-        print(v[1][idx])
-
-
-    #Record final salinity as .npy, also move full CBC and UCN files to expt folder
-    _ = record_salinity(m,ts_hms=ts_hms);
-    copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
-    #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
-
-    print('Finished iteration ',it,'out of ',tot_it)
-#Save inputParams immediately to prevent accidental destruction of them
-savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),inputParams)
-
-#import pandas
-#inputDF = pandas.DataFrame(inputParams)
-#print(inputDF)
-
-# In[37]:
-'''
-Load Data
-Calculate modified Hausdorff distance matrix
-Save for DGSA applications
 '''
 
+
+# ### Load data, calc Hausdorff distance matrix
+# In[225]:
 
 import glob
-from scipy.io import savemat
 saveyn=1
 
 def mod_hausdorff(u,v):
@@ -1184,7 +1391,7 @@ for k,v in idx_dict.items():
 #Do the same with inputParams dictionary
 i=0
 inputParams_filt = {}
-for k,v in inputParams.items():
+for k,v in m.inputParams.items():
     vnew = [x for i, x in enumerate(v) if i not in filt]
     inputParams_filt[k] = vnew
     if i==0:
@@ -1211,313 +1418,4 @@ if saveyn==1:
     np.save(m.MC_file.parent.joinpath('hausdorff.npy'),hdorf_mat)
     savemat(m.MC_file.parent.joinpath('hausdorff.mat').as_posix(),hdorf_matdict)
 
-
-# In[50]:
-
-import matplotlib.pyplot as plt
-plt.imshow(hdorf_mat);plt.colorbar()
-plt.title('Modified Hausdorff distance matrix')
-plt.show()
-print(list(inputParams.keys()))
-
-
-# In[41]:
-
-
-
-
-# In[168]:
-
-
-
-
-# In[51]:
-
-import numpy.ma as ma
-pctage = np.array([.05,.5,.95])
-salthresh = Cfresh + (Csalt-Cfresh)*pctage
-tol = [.3,.2,.03]
-for i in range(conc_mat.shape[0]):
-    if i>10:
-        break
-    for k in range(len(pctage)):
-        plt.figure()
-        mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) & (conc_mat[i]>salthresh[k]*(1-tol[k])),conc_mat[i])
-        plt.imshow(mskd[:,1,:])
-        plt.title('Masked points from it. ' + str(i))
-
-
-# In[ ]:
-
-
-
-
-# # Reading in real data
-
-# In[452]:
-
-import pandas
-from pathlib import Path
-ws = Path(m.model_ws)
-basedir = ws.joinpath('..','..')
-datadir = basedir.joinpath('data')
-fname = datadir.joinpath('seepage_flow_2015.xlsx')
-flowsheet = pandas.read_excel(fname,skiprows=1)
-print('Columns: ',flowsheet.columns)
-
-
-# cmap='jet'
-#
-# plt.scatter(flowsheet.X,flowsheet.Y,s=flowsheet.Flow,c=100-flowsheet.pctFW,cmap=cmap,vmin=0,vmax=100)
-#
-
-# printyn = 0
-# layer= 1
-# cmap='jet'
-# f = plt.figure(figsize=(4, 10))
-# ax = plt.subplot()
-# ax.set_xlabel('X UTM (m)')
-# ax.set_ylabel('Y UTM (m)')
-# modmap = flopy.plot.ModelMap(model=m,ax=ax,rotation=rotation,xul=xul,yul=yul,layer=layer)
-#
-# modmap.plot_ibound()
-# ax.set_aspect('equal')
-# scat = plt.scatter(flowsheet.X,flowsheet.Y,c=100-flowsheet.pctFW,cmap=cmap,vmin=0,vmax=100)
-# #cpatchcollection = modmap.plot_array(conc,cmap=cmap)
-# cb= f.colorbar(scat)
-# #cb.set_label('Concentration (g/L)')
-# cb.set_label('Pct Saltwater')
-#
-# if printyn == 1:
-#     plt.savefig(os.path.join(m.model_ws, m.name + '_topview_lay ' + str(layer) +
-#                              '_per' + str(per) + '.png'),dpi=300)
-# plt.show()
-
-# In[ ]:
-
-
-
-
-# #Issue: which "flow" is the correct flow?
-#     #Can get flow from the cell-by-cell file in either FLOW RIGHT FACE and FLOW LOWER FACE
-#     # Or from the constant head flow
-#
-# ocean_flow = get_ocean_outflow(m,ocean_col);
-# print('total flow into ocean cells from const. head flow:',-np.sum(ocean_flow),'m^3/d')
-#
-# fname = os.path.join(model_ws, '' + modelname + '.cbc')
-# budobj = flopy.utils.CellBudgetFile(fname)
-# qx = budobj.get_data(text='FLOW RIGHT FACE')[-1]
-# qz = budobj.get_data(text='FLOW LOWER FACE')[-1]
-# tot_flow = np.sum( np.sqrt(np.square(-qz[ocean_coords]) + np.square(qx[ocean_coords])))
-# print('Total flow from lower-right face in cbc file', tot_flow ,'m^3/d' )
-
-# In[453]:
-
-lvls = (Csalt-Cfresh)*np.array([.05,.5,.95]) + Cfresh
-
-indtop = np.where(verts[:,0] > botm_vector[0])[0]
-indbot = np.where(verts[:,0] < botm_vector[-2])[0]
-inds = np.hstack((indtop,indbot))
-
-
-p = CS.collections[2].get_paths()[0]
-v = p.vertices
-x = v[:,0]
-y = v[:,1]
-plt.scatter(x,y)
-plt.scatter(verts[inds][:,2],verts[inds][:,0])
-plt.axis('equal')
-
-def extract_contourpoints_2d(np_array,levels):
-    if len(np_array.shape) == 2:
-        CS = plt.contour(array,levels=lvls);
-    elif len(np_array.shape) > 2:
-        pass
-        #do something
-    return
-print(x[0],x[-1])
-print(y[0],y[-1])
-
-print(verts[indtop])
-print(verts[indbot])
-
-
-
-# In[ ]:
-
-def keep_running(m,new_perlen):
-    fname = os.path.join(model_ws, 'MT3D001.UCN')
-    ucnobj = flopy.utils.binaryfile.UcnFile(fname)
-    conc = ucnobj.get_data(totim=ucnobj.get_times()[-1])
-    new_sconc = np.abs(np.round(conc,decimals=1))
-    new_sconc[ocean_line_tuple] = Csalt
-    new_sconc[right_edge] = Csalt
-    new_sconc[:,:,0] = Cfresh
-    new_sconc[np.isnan(new_sconc)] = 0.
-    # Add DIS package to the MODFLOW model
-    dis = flopy.modflow.ModflowDis(m, nlay, nrow, ncol, nper=nper, delr=delr,
-                                   delc=delc, xul=xul, yul=yul, rotation=rotation,
-                                   laycbd=0, top=henry_top,
-                                   botm=henry_botm, perlen=new_perlen, nstp=nstp,
-                                   steady=steady,itmuni=itmuni,lenuni=lenuni,
-                                   tsmult=tsmult)
-
-    #Create the basic MT3DMS model structure
-    btn = flopy.mt3d.Mt3dBtn(m,
-                             laycon=lpf.laytyp, htop=henry_top,
-                             dz=dis.thickness.get_value(), prsity=0.2, icbund=icbund,
-                             sconc=new_sconc)
-    #Write input
-    m.write_input()
-    # Try to delete the output files, to prevent accidental use of older files
-    try:
-        os.remove(os.path.join(model_ws,'MT3D.CNF'))
-        os.remove(os.path.join(model_ws,'MT3D001.MAS'))
-        os.remove(os.path.join(model_ws, 'MT3D001.UCN'))
-        os.remove(os.path.join(model_ws, modelname + '.hds'))
-        os.remove(os.path.join(model_ws, modelname + '.cbc'))
-    except:
-        pass
-    m.run_model()
-    return
-
-
-# In[ ]:
-
-keep_running(m,[1000,1000,1000])
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-import numpy as np
-from numpy import sin, cos, pi
-from skimage import measure
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
-verts, faces, norms, vals = measure.marching_cubes(conc, level=lvls[1], spacing=(-delv, delc, delr))
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_trisurf(verts[:, 2], verts[:,1], faces, verts[:, 0],
-                cmap='Spectral', lw=1)
-plt.xlabel('Distance (m) columns')
-plt.ylabel('Distance (m) rows')
-plt.show()
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[472]:
-
-#Functions for extracting 'return variables' from data
-def get_inds(verts,botm_vector):
-    indtop = np.where(verts[:,0] > botm_vector[0])[0]
-    indbot = np.where(verts[:,0] < botm_vector[-2])[0]
-    return indtop,indbot
-
-def get_angles(verts,norms,botm_vector):
-    #takes the verts and norms arrays that are outputs of
-    #skimage.measure.marching_cubes()
-    #Returns:
-    #   theta_top:  avg angle between horizontal and topmost (tip) values
-    #   theta_botm: avg angle between horizontal and bottommost (toe) values
-    #   theta_avg:  avg angle between toe and tip. Defined as theta in Badaruddin et al., 2017
-    indtop,indbot = get_inds(verts,botm_vector)
-    horznorm = [1,0,0] #in lay,row,col format i.e. z,y,x
-    theta_top = np.mean(np.arccos(np.dot(norms[indtop],horznorm)))
-    theta_botm = np.mean(np.arccos(np.dot(norms[indbot],horznorm)))
-    theta_avg = np.arctan(
-        (np.mean(verts[indtop][:,0]) - np.mean(verts[indbot][:,0]))
-        /(np.mean(verts[indtop][:,2]) - np.mean(verts[indbot][:,2])))
-    return [theta_top,theta_botm,theta_avg]
-
-def get_avg_width_dist(array, lvls, spacing=None):
-    #calls the function skimage.measure.marching_cubes()
-    #to retrieve estimates on transition zone parameters
-    #returns np.nan if the value cannot be calculated because the contour hits the edge of model
-    #Input arguments:
-    #   array: 3-d array to be contoured
-    #   lvls: list of length 2, used for contouring. Should be in ascending order!
-    #   spacing: tuple of the spacing of input array, i.e. (delv,delc,delr) for MODFLOW arrays
-    #Returns:
-    #   width_tip_avg: avg topmost width between the two values in lvls
-    #   width_toe_avg: avg bottommost width between the two values in lvls
-    #   xtip_avg:      avg topmost x-position of the first input of lvls in dimensions of the array
-    #   xtoe_avg:      avg bottommost x-position of the first input of lvls in dimensions of the array
-    if spacing is None:
-        spacing = (-delv, delc, delr)
-    indtop_all,indbot_all = [],[]
-    verts,faces,norms,vals = {},{},{},{}
-    for i,lvl in enumerate(lvls):
-        verts[i], faces[i], norms[i], vals[i] = measure.marching_cubes(conc, level=lvl, spacing=spacing)
-        indtop,indbot = get_inds(verts[i],botm_vector)
-        indtop_all.append(indtop)
-        indbot_all.append(indbot)
-    test_bot = [indarray.size for indarray in indbot_all]
-    test_top = [indarray.size for indarray in indtop_all]
-    if 0 in test_top:
-        warnings.warn('\n -->Full tip not within model. Placing nan as stand-in<---')
-        width_tip_avg = np.nan
-    else:
-        width_tip_avg = np.mean(verts[1][indtop_all[1]] - verts[0][indtop_all[0]],axis=0)[2]
-
-    if 0 in test_bot:
-        warnings.warn('\n -->Full toe not within model. Placing nan as stand-in<---')
-        width_toe_avg = np.nan
-    else:
-        width_toe_avg = np.mean(verts[1][indbot_all[1]] - verts[0][indbot_all[0]],axis=0)[2]
-
-    if test_bot[0]==0:
-        warnings.warn('\n -->Toe x-pos not within model. Placing nan as stand-in<---')
-        xtoe_avg = np.nan
-    else:
-        xtoe_avg = np.mean(verts[0][indbot_all[0]],axis=0)[2]
-
-    if test_top[0]==0:
-        warnings.warn('\n -->Tip x-pos not within model. Placing nan as stand-in<---')
-        xtip_avg = np.nan
-    else:
-        xtip_avg = np.mean(verts[0][indtop_all[0]],axis=0)[2]
-
-    return width_tip_avg,width_toe_avg,xtip_avg,xtoe_avg
 

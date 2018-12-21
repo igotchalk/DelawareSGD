@@ -11,10 +11,10 @@ addpath(genpath('/Users/ianpg/Documents/ProjectsLocal/DGSA-master'))
 %% 1. Specify inputs for DGSA. 
 
 %load hausdorff matrix
-ws = './DelawareSGD/work/homogenous/';
-exptdir = 'MC_expt_2018-12-17-10-10';
+
+exptdir = '/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/homogenous/MC_expt_2018-12-20-20-39';
 f = 'hausdorff.mat';
-fname = fullfile(ws,exptdir,f);
+fname = fullfile(exptdir,f);
 load(fname)
 
 %This is added for the to fix the messed up hdorf matrix
@@ -75,7 +75,7 @@ DGSA=ComputeConditionalEffects(DGSA);
 % Speicify the method to display standardized conditional effects.
 DGSA.ConditionalEffects.Display.SensitivityByClusterAndBins=1; % if true, display pareto plots to visualize sensitivities by bins/clusters. 
 DGSA.ConditionalEffects.Display.StandardizedSensitivity='Hplot'; % If omitted Pareto plot will be used. However, this is not recommended when there are lots of parameters
-
+%%
 % Visualize conditional effects
 DisplayConditionalEffects(DGSA,DGSA.ConditionalEffects.Display.StandardizedSensitivity)
 
