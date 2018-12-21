@@ -5,8 +5,6 @@
 # ## Simple Model of SGD
 # 
 # 
-
-
 import os
 from pathlib import Path
 import sys
@@ -18,7 +16,7 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 2
+tot_it = 50
 
 # run installed version of flopy or add local path
 try:
@@ -27,7 +25,6 @@ except:
     fpth = os.path.abspath(os.path.join('..', '..'))
     sys.path.append(fpth)
     import flopy
-import SGD
 
 print(sys.version)
 print('numpy version: {}'.format(np.__version__))
@@ -42,6 +39,8 @@ if not os.path.exists(model_ws):
     os.makedirs(model_ws)
 sys.path.append(os.path.join(model_ws,'..','..'))
 import config
+import SGD
+
 sw_exe = config.swexe #set the exe path for seawat
 print('Model workspace:', os.path.abspath(model_ws))
 
@@ -422,14 +421,13 @@ def sample_dist(distclass,size,writeyn=0,model=None,varname=None,log_backtransf=
     return smp
 
 def write_sample(fname,varname,distclass,sample):
-    fout= open(fname,"a")
-    fout.write(varname + ',' + str(type(distclass)) + ',' + str(sample) + '\n')
-    fout.close()
+    with fname.open(mode='a') as fout:
+        fout.write(varname + ',' + str(type(distclass)) + ',' + str(sample) + '\n')
+        fout.close()
     return
 
 
 # In[ ]:
-
 
 
 
@@ -1109,12 +1107,11 @@ if printyn == 1:
     plt.savefig(os.path.join(m.model_ws, m.name + '_' + ts + '_flowvec_row' + str(rowslice) +
                              '_per' + str(per) + '_' + lbl[:3] + '.png'),dpi=150)
 plt.show()
-
-
+'''
 # In[80]:
 
-mas = plot_mas(m)
-'''
+#mas = plot_mas(m)
+
 
 # ## MC experiment
 # Rerun model, select new parameter value for each input param and record.
@@ -1132,9 +1129,9 @@ def create_MC_file():
     MC_dir = Path(os.path.join(m.model_ws, 'MC_expt_' + ts))
     if not MC_dir.exists():
         MC_dir.mkdir()
-    m.MC_file = Path(os.path.join(MC_dir,'expt.txt'))
-    fout= open(m.MC_file,"w")
-    fout.close()
+    m.MC_file = MC_dir.joinpath('expt.txt')
+    with m.MC_file.open('w') as wf:
+        wf.close()
     print(m.MC_file)
     return
 
@@ -1168,14 +1165,10 @@ def record_salinity(m,totim=None,fname_write=None,ts_hms=None):
 def copy_rename(old_file_name, new_file_name):
     import os
     import shutil
-    src_dir= os.curdir
-    dst_dir= os.path.join(os.curdir , "subfolder")
-    src_file = os.path.join(src_dir, old_file_name)
-    shutil.copy(src_file,dst_dir)
-
-    dst_file = os.path.join(dst_dir, old_file_name)
-    new_dst_file_name = os.path.join(dst_dir, new_file_name)
-    os.rename(dst_file, new_dst_file_name)
+    from pathlib import Path
+    src_file = Path(old_file_name)
+    dst_file = Path(new_file_name)
+    shutil.copy(str(src_file),str(dst_file))
     return
     
 def reassign_m():
@@ -1270,7 +1263,6 @@ def check_MC_inputParams():
         use_existing_MCfile = get_yn_response("m.MC_file already exists, continue using this experiment?")
     else:
         use_existing_MCfile = False
-
     if use_existing_MCfile:
         if m.inputParams is not None:
             if len(m.inputParams)>0:
@@ -1294,38 +1286,6 @@ def check_MC_inputParams():
 
 
 # In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
 
 
 # ### Run the MC experiment:
@@ -1410,7 +1370,7 @@ def run_MC(tot_it):
         add_to_paramdict(m.inputParams,parname,farm_rech_flux)
 
         ##wel
-        lowhigh = np.log10((1e1,1e3))
+        lowhigh = np.log10((1e0,1e2))
         wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
         parname = 'wel'
         for i in range(n_wells):
@@ -1427,7 +1387,7 @@ def run_MC(tot_it):
         
         ##riv_cond
         parname = 'riv_cond'
-        lowhigh = np.log10((.1,100))
+        lowhigh = np.log10((1,100))
         cond = sample_dist(sts.uniform,1,0,m,'riv_cond',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
         add_to_paramdict(m.inputParams,parname,cond)
         
@@ -1508,6 +1468,7 @@ def run_MC(tot_it):
 inputParams = run_MC(tot_it)
 
 ####Run the MC experiment ####
+
 
 
 # In[ ]:
