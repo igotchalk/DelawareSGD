@@ -16,7 +16,6 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 10
 
 # run installed version of flopy or add local path
 try:
@@ -49,6 +48,27 @@ print('Model workspace:', os.path.abspath(model_ws))
 # 
 
 # In[61]:
+def save_obj(MC_file,obj, name ):
+    import pickle
+    with open(MC_file.parent.joinpath(name + '.pkl').as_posix(), 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(MC_file,name ):
+    import pickle
+    with open(MC_file.parent.joinpath(name + '.pkl').as_posix(), 'rb') as f:
+        return pickle.load(f)
+
+def create_MC_file():
+    import datetime
+    ts = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
+    MC_dir = Path(os.path.join(m.model_ws, 'MC_expt_' + ts))
+    if not MC_dir.exists():
+        MC_dir.mkdir()
+    m.MC_file = MC_dir.joinpath('expt.txt')
+    with m.MC_file.open('w') as wf:
+        wf.close
+    print(m.MC_file)
+    return
 
 #nearest value in array
 def find_nearest(array,value):
@@ -635,6 +655,9 @@ chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts()
 wel_data_base,ssm_data_base = wel_data,ssm_data
 timprs = np.round(np.linspace(1,np.sum(perlen),20),decimals=0)
 
+create_MC_file()
+save_obj(m.MC_file,wel_data_base,'wel_data_base')
+save_obj(m.MC_file,ssm_data_base,'ssm_data_base')
 
 # In[ ]:
 
@@ -1123,17 +1146,6 @@ plt.show()
 import scipy.stats as sts
 
 #Create new MC_file
-from pathlib import Path
-def create_MC_file():
-    ts = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
-    MC_dir = Path(os.path.join(m.model_ws, 'MC_expt_' + ts))
-    if not MC_dir.exists():
-        MC_dir.mkdir()
-    m.MC_file = MC_dir.joinpath('expt.txt')
-    with m.MC_file.open('w') as wf:
-        wf.close()
-    print(m.MC_file)
-    return
 
 def add_to_paramdict(paramdict,paramname,val):
     if paramdict is None:
@@ -1248,15 +1260,6 @@ def get_value(prompt):
             continue
     return resp
 
-def save_obj(MC_file,obj, name ):
-    import pickle
-    with open(MC_file.parent.joinpath(name + '.pkl').as_posix(), 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-def load_obj(MC_file,name ):
-    import pickle
-    with open(MC_file.parent.joinpath(name + '.pkl').as_posix(), 'rb') as f:
-        return pickle.load(f)
 
 def check_MC_inputParams():
     if m.MC_file is not None:
@@ -1354,7 +1357,9 @@ def run_MC(tot_it):
             parname_temp = parname+str(i)
             add_to_paramdict(m.inputParams,parname_temp,wel_flux[i])    
         #write wel data
-        wel_data,ssm_data_wel = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)    
+        ssm_data_base = load_obj(m.MC_file,'ssm_data_base')
+        wel_data_base = load_obj(m.MC_file,'wel_data_base')
+        wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)    
 
         ##riv_stg
         parname = 'riv_stg'
@@ -1370,7 +1375,7 @@ def run_MC(tot_it):
         
         #Write river data--take SSM data from WEL!!
         riv_grad = .0005
-        riv_data,ssm_data = write_river_data(riv_loc,stage,cond,riv_grad,kper_even,ssm_data_wel)            
+        riv_data,ssm_data = write_river_data(riv_loc,stage,cond,riv_grad,kper_even,ssm_data)            
             
         ###### Reassign, run record ######
         #Reassign to model object
@@ -1439,6 +1444,7 @@ def run_MC(tot_it):
 # In[84]:
 
 ####Run the MC experiment ####
+tot_it = 1000
 inputParams = run_MC(tot_it)
 
 ####Run the MC experiment ####
@@ -1549,7 +1555,7 @@ if saveyn==1:
 
 
 # In[87]:
-
+''''
 import matplotlib.pyplot as plt
 plt.imshow(hdorf_mat);plt.colorbar()
 plt.title('Modified Hausdorff distance matrix')
@@ -1567,7 +1573,6 @@ print(list(m.inputParams.keys()))
 
 
 # In[88]:
-
 import numpy.ma as ma
 pctage = np.array([.05,.5,.95])
 pctage = np.array([.5])
@@ -1584,3 +1589,4 @@ for i in range(conc_mat.shape[0]):
         plt.imshow(mskd[:,farm_orig[1][0],:])
         plt.title('Masked points from iter. ' + str(i))
 
+'''

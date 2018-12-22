@@ -16,15 +16,15 @@ end
 
 %load hausdorff matrix
 
-exptdir = '/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/homogenous/MC_expt_2018-12-20-23-41';
-f = 'hausdorff.mat';
-fname = fullfile(exptdir,f);
-load(fname)
-
-%This is added for the to fix the messed up hdorf matrix
-hausdorff_mat(496:end,:)= [];
-hausdorff_mat(:,496:end)= [];
-%ParametersValues(:,4:7) = log10(ParametersValues(:,4:7));
+exptdir = '/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/homogenous/MC_expt_2018-12-21-23-51';
+finput = 'hausdorff.mat';
+%fhausdorff = 'hausdorff.csv';
+load(fullfile(exptdir,finput));
+%% 
+sz = size(hausdorff_mat);
+if sz(1)~=sz(2)
+    hausdorff_mat = squareform(hausdorff_mat);
+end
 %% 2. Load & process input data
 D = hausdorff_mat;
 N = length(D);
@@ -38,10 +38,32 @@ DGSA.N = N;
 DGSA.ParametersValues = ParametersValues;
 DGSA.ParametersNames = ParametersNames;
 
+%%
+
+zeroResp = D(:,1)==0;
+logvalues = [4,5,6,7,8,9,10,12];
+log10_str = @(x) log10(str2num(x));
+
+fig = figure;
+for i=1:12
+    ax = subplot(4,3,i);
+    if ismember(i,logvalues)
+        val = log10(ParametersValues(:,i));
+    else
+        val = ParametersValues(:,i);
+    end
+    histogram(val(zeroResp),'DisplayName','zero-value');
+    hold on
+    histogram(val(~zeroResp),'DisplayName','value');
+    title(ParametersNames{i});
+    if i==1
+        legend;
+    end
+end
 %% 4. Compute & display main effects
 
 % 4.1 Inputs for clustering and display options.
-DGSA.Nbcluster=2; % # of clusters
+DGSA.Nbcluster=3; % # of clusters
 DGSA.MainEffects.Display.ParetoPlotbyCluster=1; % if true, main effects over cluster will be displayed with Pareto plot.
 DGSA.MainEffects.Display.StandardizedSensitivity='CI'; 
 
