@@ -18,7 +18,7 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 2
+tot_it = 1000
 
 # run installed version of flopy or add local path
 try:
@@ -27,7 +27,6 @@ except:
     fpth = os.path.abspath(os.path.join('..', '..'))
     sys.path.append(fpth)
     import flopy
-import SGD
 
 print(sys.version)
 print('numpy version: {}'.format(np.__version__))
@@ -41,6 +40,7 @@ elif sys.platform == "win32":
 if not os.path.exists(model_ws):
     os.makedirs(model_ws)
 sys.path.append(os.path.join(model_ws,'..','..'))
+import SGD
 import config
 sw_exe = config.swexe #set the exe path for seawat
 print('Model workspace:', os.path.abspath(model_ws))
@@ -234,9 +234,9 @@ delv_first = 5
 
 botm_first = henry_top-delv_first
 
-nlay = int(Lz*1/5)
-nrow = int(Ly*(1/50))
-ncol = int(Lx*(1/50))
+nlay = int(Lz*1/3)
+nrow = int(Ly*(1/30))
+ncol = int(Lx*(1/30))
 
 delv = (Lz-delv_first) / (nlay-1)
 delr = Lx / ncol
@@ -264,9 +264,6 @@ offshore_elev = -beachslope*(ocean_col[1]-ocean_col[0])*delr
 
 
 #Period data
-perlen = [100,100,15000]
-nstp = [5,5,5]
-
 Lt = 360*20 #Length of time in days
 perlen = list(np.repeat(180,int(Lt/180)))
 nstp = list(np.ones(np.shape(perlen),dtype=int))
@@ -427,7 +424,7 @@ def sample_dist(distclass,size,writeyn=0,model=None,varname=None,log_backtransf=
     return smp
 
 def write_sample(fname,varname,distclass,sample):
-    fout= open(fname,"a")
+    fout= open(str(fname),"a")
     fout.write(varname + ',' + str(type(distclass)) + ',' + str(sample) + '\n')
     fout.close()
     return
@@ -833,43 +830,39 @@ for kper in range(nper):
 # In[13]:
 
 #Create instances in flopy
-def assign_m():
-    bas = flopy.modflow.ModflowBas(m, ibound, strt=strt)
-    if bc_ocean=='CHD' or bc_inland=='CHD' :
-        chd = flopy.modflow.ModflowChd(m, stress_period_data=chd_data)
-    if bc_ocean=='GHB' or bc_inland=='GHB'or bc_right_edge=='GHB':
-        ghb = flopy.modflow.ModflowGhb(m, stress_period_data=ghb_data)
-    wel = flopy.modflow.ModflowWel(m, stress_period_data=wel_data, ipakcb=ipakcb)
-    rch = flopy.modflow.ModflowRch(m, rech=rech_data)
-    riv = flopy.modflow.ModflowRiv(m, stress_period_data=riv_data)
+bas = flopy.modflow.ModflowBas(m, ibound, strt=strt)
+if bc_ocean=='CHD' or bc_inland=='CHD' :
+    chd = flopy.modflow.ModflowChd(m, stress_period_data=chd_data)
+if bc_ocean=='GHB' or bc_inland=='GHB'or bc_right_edge=='GHB':
+    ghb = flopy.modflow.ModflowGhb(m, stress_period_data=ghb_data)
+wel = flopy.modflow.ModflowWel(m, stress_period_data=wel_data, ipakcb=ipakcb)
+rch = flopy.modflow.ModflowRch(m, rech=rech_data)
+riv = flopy.modflow.ModflowRiv(m, stress_period_data=riv_data)
 
-    # Add LPF package to the MODFLOW model
-    lpf = flopy.modflow.ModflowLpf(m, hk=hk, vka=vka, ipakcb=ipakcb,laytyp=1)
+# Add LPF package to the MODFLOW model
+lpf = flopy.modflow.ModflowLpf(m, hk=hk, vka=vka, ipakcb=ipakcb,laytyp=1)
 
-    # Add PCG Package to the MODFLOW model
-    pcg = flopy.modflow.ModflowPcg(m, hclose=1.e-8)
+# Add PCG Package to the MODFLOW model
+pcg = flopy.modflow.ModflowPcg(m, hclose=1.e-8)
 
-    # Add OC package to the MODFLOW model
-    oc = flopy.modflow.ModflowOc(m,
-                                 stress_period_data=oc_data,
-                                 compact=True)
+# Add OC package to the MODFLOW model
+oc = flopy.modflow.ModflowOc(m,
+                             stress_period_data=oc_data,
+                             compact=True)
 
-    #Create the basic MT3DMS model structure
-    btn = flopy.mt3d.Mt3dBtn(m, 
-                             laycon=lpf.laytyp, htop=henry_top, 
-                             dz=dis.thickness.get_value(), prsity=0.2, icbund=icbund,
-                             sconc=sconc, nprs=1,timprs=timprs)
-    adv = flopy.mt3d.Mt3dAdv(m, mixelm=-1)
-    dsp = flopy.mt3d.Mt3dDsp(m, al=al, dmcoef=dmcoef)
-    gcg = flopy.mt3d.Mt3dGcg(m, iter1=50, mxiter=1, isolve=1, cclose=1e-5)
-    ssm = flopy.mt3d.Mt3dSsm(m, stress_period_data=ssm_data)
+#Create the basic MT3DMS model structure
+btn = flopy.mt3d.Mt3dBtn(m, 
+                         laycon=lpf.laytyp, htop=henry_top, 
+                         dz=dis.thickness.get_value(), prsity=0.2, icbund=icbund,
+                         sconc=sconc, nprs=1,timprs=timprs)
+adv = flopy.mt3d.Mt3dAdv(m, mixelm=-1)
+dsp = flopy.mt3d.Mt3dDsp(m, al=al, dmcoef=dmcoef)
+gcg = flopy.mt3d.Mt3dGcg(m, iter1=50, mxiter=1, isolve=1, cclose=1e-5)
+ssm = flopy.mt3d.Mt3dSsm(m, stress_period_data=ssm_data)
 
-    #vdf = flopy.seawat.SeawatVdf(m, iwtable=0, densemin=0, densemax=0,denseref=1000., denseslp=0.7143, firstdt=1e-3)
-    vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1, 
-                                 densemin=0., densemax=0., denseslp=denseslp, denseref=densefresh)
-    return
-
-assign_m()
+#vdf = flopy.seawat.SeawatVdf(m, iwtable=0, densemin=0, densemax=0,denseref=1000., denseslp=0.7143, firstdt=1e-3)
+vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1, 
+                             densemin=0., densemax=0., denseslp=denseslp, denseref=densefresh)
 
 
 # In[ ]:
@@ -885,9 +878,9 @@ assign_m()
 # In[14]:
 
 printyn = 0
-gridon=1
+gridon=0
 rowslice=riv_loc[1][0]
-rowslice = farm_orig[0][0]
+#rowslice = farm_orig[0][0]
 #m.plot_hk_ibound(rowslice=rowslice,printyn=printyn,gridon=gridon);
 
 
@@ -1120,6 +1113,8 @@ def check_MC_inputParams():
         if m.inputParams is not None:
             if len(m.inputParams)>0:
                 add_to_inputParams = get_yn_response("m.inputParams already has entries, do you want to add to it?")
+            else:
+                add_to_inputParams =False
             if add_to_inputParams:
                 pass
             else: 
@@ -1436,8 +1431,8 @@ hdorf_mat = np.zeros((len(idx_dict_filt),len(idx_dict_filt)),dtype=float)
 hdorf_list= []
 for i in range(len(idx_dict_filt)):
     for j in range(i+1,len(idx_dict_filt)):
-        #hdorf_mat[i,j] = mod_hausdorff(ptset_dict[j],ptset_dict[i])
-        hdorf_list.append(mod_hausdorff(ptset_dict[j],ptset_dict[i]))
+        hdorf_mat[i,j] = mod_hausdorff(ptset_dict[j],ptset_dict[i])
+        hdorf_list.append(hdorf_mat[i,j])
 hdorf_mat = hdorf_mat + hdorf_mat.T
 #Save hausdorff matrix, Input Parameter Values
 ParametersValues = np.zeros((N,len(inputParams_filt)))
@@ -1460,7 +1455,24 @@ plt.title('Modified Hausdorff distance matrix')
 
 # In[ ]:
 
-
+import numpy.ma as ma
+rowslice = farm_orig[1][0]
+rowslice = riv_loc[1][0]
+#rowslice = 0
+pctage = np.array([.05,.5,.95])
+pctage = np.array([.5])
+salthresh = Cfresh + (Csalt-Cfresh)*pctage #salinity corresponding to the spec. percentage
+tol = [.3,.2,.03]
+tol = [.2]
+for i in range(conc_mat.shape[0]):
+    if i>15:
+        break
+    for k in range(len(pctage)):
+        plt.figure()
+        mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) & 
+                               (conc_mat[i]>salthresh[k]*(1-tol[k])),conc_mat[i])
+        plt.imshow(mskd[:,rowslice,:])
+        plt.title('Masked points from iter. ' + str(i))
 
 
 # In[ ]:
