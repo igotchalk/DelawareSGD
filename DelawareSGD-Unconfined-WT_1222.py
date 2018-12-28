@@ -18,7 +18,7 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 1000
+tot_it = 200
 
 # run installed version of flopy or add local path
 try:
