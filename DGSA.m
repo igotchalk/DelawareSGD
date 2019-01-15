@@ -16,7 +16,7 @@ end
 
 %load hausdorff matrix
 
-exptdir = '/Users/ianpg/Documents/ProjectsLocal/DelawareSGD/work/homogenous/MC_expt_2018-12-22-02-28';
+exptdir = '/Users/ianpg/Dropbox/TempShared/MC_expt';
 finput = 'hausdorff.mat';
 %fhausdorff = 'hausdorff.csv';
 load(fullfile(exptdir,finput));
@@ -30,6 +30,14 @@ D = hausdorff_mat;
 N = length(D);
 ParametersValues = ParametersValues;
 ParametersNames = fieldnames(InputParams)';
+
+ParametersValues2 = ParametersValues;
+logvalues = [4,5,6,7,8,9,10,12];
+for i=1:12
+    if ismember(i,logvalues)
+        ParametersValues2(:,i) = log10(ParametersValues(:,i));
+    end
+end
 
 
 DGSA={};
@@ -52,9 +60,13 @@ for i=1:12
     else
         val = ParametersValues(:,i);
     end
-    histogram(val(zeroResp),'DisplayName','zero-value');
+    h = histogram(val(zeroResp),'DisplayName','zero-value',...
+        'Normalization','Probability');
+    binedge = h.BinEdges;
     hold on
-    histogram(val(~zeroResp),'DisplayName','value');
+    h2 = histogram(val(~zeroResp),'DisplayName','value',...
+                'Normalization','Probability');
+    %h2.BinEdges = binedge;
     title(ParametersNames{i});
     if i==1
         legend;
