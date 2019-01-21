@@ -16,7 +16,7 @@ end
 
 %load hausdorff matrix
 
-exptdir = '/Users/ianpg/Dropbox/TempShared/MC_expt';
+exptdir = '/Users/ianpg/Dropbox/TempShared/MC_expt_2019-01-08-02-50';
 finput = 'hausdorff.mat';
 %fhausdorff = 'hausdorff.csv';
 load(fullfile(exptdir,finput));

@@ -23,10 +23,11 @@ def idx2centroid(node_coord_tuple,idx_tuple):
     return (z_pt,y_pt,x_pt)
 
 
-def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10):
+def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=None):
     import numpy.ma as ma
     import numpy as np
     import matplotlib.pyplot as plt
+    from pathlib import Path
     Csalt = 35.0001
     Cfresh = 0
     #pctage = np.array([.05,.5,.95])
@@ -38,16 +39,22 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10):
         if i>conc_mat.shape[0]:
             break
         for k in range(len(pctage)):
-            plt.figure()
+            f, axs = plt.subplots()
             mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) &
                                    (conc_mat[i]>salthresh[k]*(1-tol[k])),conc_mat[i])
-            plt.imshow(mskd[:,rowslice,:])
-            plt.title('Masked points from iter. ' + str(i))
+            cpatch = plt.imshow(mskd[:,rowslice,:])
+            plt.title('iter. {}, slice {} \nMasked points shown in white'.format(i,rowslice))
+            #cbar_ax = f.add_axes([0.90, 0.1, 0.02, 0.7])
+            #cb = f.colorbar(cpatch,cax=cbar_ax)
+            cb = plt.colorbar(ax=axs)
+            cb.set_label('Salt concentration (g/L)')
             plt.show()
+            if saveyn==1:
+                plt.savefig(Path(dirname).joinpath('conc_it{}_slice{}.png'.format(i,rowslice)),dpi=150)
     return
 
 
-def compute_export_hausdorff(dirname,conc_mat=None,saveyn=1):
+def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1):
     import glob
     import os
     import flopy
@@ -82,6 +89,7 @@ def compute_export_hausdorff(dirname,conc_mat=None,saveyn=1):
 
     idx_dict = {}
     for i in range(len(conc_mat)):
+        print('it',i)
         idx_dict[i] = np.where((conc_mat[i]<pct50*(1+tol)) & (conc_mat[i]>pct50*(1-tol)))
 
     #Filter out keys that have errors and make new dict with filled sequential keys
@@ -119,7 +127,8 @@ def compute_export_hausdorff(dirname,conc_mat=None,saveyn=1):
 
     #create pointset dictionary: (x1,y1,z1),...
     #   from the numpy tuple format: (x1,x2,...),(y1,y2,...),(z1,z2,...)
-    yxz = m.dis.get_node_coordinates()
+    if yxz is None:
+        yxz = m.dis.get_node_coordinates()
     ptset_dict = {}
     for i in range(len(idx_dict_filt)):
         print('iteration',i)
