@@ -38,7 +38,7 @@ for i=1:12
         ParametersValues2(:,i) = log10(ParametersValues(:,i));
     end
 end
-
+%%
 
 DGSA={};
 DGSA.D = D;
@@ -139,6 +139,6 @@ function out_cellarray = names2latex(name_cellarray)
             out_cellarray{i} = sp{1};
         end
         
-        %out_cellarray{i} = strcat('$$',out_cellarray{i},'$$');
+        out_cellarray{i} = strcat('$$',out_cellarray{i},'$$');
     end
 end 
