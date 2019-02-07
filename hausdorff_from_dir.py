@@ -35,13 +35,14 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=N
     salthresh = Cfresh + (Csalt-Cfresh)*pctage #salinity corresponding to the spec. percentage
     #tol = [.3,.2,.03]
     tol = [.2]
-    for i in range(startind,startind+numplots):
+    for i in range(startind+numplots-1,startind-1,-1):
         if i>conc_mat.shape[0]:
             break
         for k in range(len(pctage)):
             f, axs = plt.subplots()
             mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) &
-                                   (conc_mat[i]>salthresh[k]*(1-tol[k])),conc_mat[i])
+                                   (conc_mat[i]>salthresh[k]*(1-tol[k])) |
+                                   (conc_mat[i]>1e10),conc_mat[i])
             cpatch = plt.imshow(mskd[:,rowslice,:])
             plt.title('iter. {}, slice {} \nMasked points shown in white'.format(i,rowslice))
             #cbar_ax = f.add_axes([0.90, 0.1, 0.02, 0.7])
@@ -54,7 +55,7 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=N
     return
 
 
-def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1):
+def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1,pct=(.05,.95)):
     import glob
     import os
     import flopy
@@ -87,15 +88,26 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1):
         for i,fname in enumerate(conc_fnames):
             conc_mat[i] = np.load(fname)
 
+    from skimage import measure
     idx_dict = {}
+    face_dict = {}
+    if pct is None:
+        pct = (.05,.95)
     for i in range(len(conc_mat)):
         print('it',i)
         idx_dict[i] = np.where((conc_mat[i]<pct50*(1+tol)) & (conc_mat[i]>pct50*(1-tol)))
+        faces = []
+        for p in pct:
+            verts, f, normals, values = measure.marching_cubes_lewiner(conc_mat[i],(Csalt+Cfresh)*p)
+            faces.append(f[np.arange(1,len(f),3),:])
+        face_dict[i] = list(map(tuple, np.vstack(faces)))
+
 
     #Filter out keys that have errors and make new dict with filled sequential keys
-    filt = [k for k, v in idx_dict.items() if len(v[0])==0
-        or (conc_mat[k].max() > Csalt*1.05)
-        or (conc_mat[k].min() < -.1)]
+    filt_mat = np.where(conc_mat>1e10,np.nan,conc_mat) #get rid of region above water table (value = 1e30)
+    filt = [k for k, v in idx_dict.items() if len(v[0])==0 #which indicies to get rid of
+        or (filt_mat[k].max() > Csalt*1.05)
+        or (filt_mat[k].min() < -.1)]
     i=0
     idx_dict_filt = {}
     for k,v in idx_dict.items():
@@ -104,6 +116,16 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1):
         else:
             idx_dict_filt[i] = v
             i+=1
+
+    i=0
+    face_dict_filt = {}
+    for k,v in face_dict.items():
+        if k in filt:
+            print('iteration ',k,'doesnt meet reqs and will be filtered out')
+        else:
+            face_dict_filt[i] = v
+            i+=1
+
 
     try:
         #Do the same with inputParams dictionary
@@ -139,12 +161,13 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1):
     hdorf_list= []
     for i in range(len(idx_dict_filt)):
         for j in range(i+1,len(idx_dict_filt)):
-            hdorf_list.append(mod_hausdorff(ptset_dict[j],ptset_dict[i]))
+            #hdorf_list.append(mod_hausdorff(ptset_dict[j],ptset_dict[i]))
+            hdorf_list.append(mod_hausdorff(face_dict_filt[j],face_dict_filt[i]))
             hdorf_mat[i,j] = hdorf_list[-1]
-            print('row ',i,' col ',j)
+            print('Calculating hausdorff row ',i,' col ',j)
     hdorf_mat = hdorf_mat + hdorf_mat.T
     hdorf_matdict['hausdorff_mat'] = hdorf_list #list of distance calculations (not squareformed)
-
+    hdorf_matdict['culled_conc_mat'] = np.delete(conc_mat, filt, 0)
     #Save hausdorff matrix, Input Parameter Values
     if saveyn==1:
         np.save(dirname.joinpath('hausdorff.npy'),hdorf_list)
@@ -191,20 +214,24 @@ def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,720
     print('Removing {} files out of {}...'.format(len(filt),len(ucn_fnames)))
     conc_mat_filt = np.zeros((len(totims),len(ucn_fnames)-len(filt),modsize[0],modsize[1],modsize[2]),dtype=float)
     it = 0
-    for i in range(len(conc_mat)):
+    for i in range(len(ucn_fnames)):
         if i not in filt:
+            print('it',it)
+            print('i',i)
             conc_mat_filt[:,it,:,:,:] = conc_mat[:,i,:,:,:]
             it+=1
     ucn_names_filt = [fname for i,fname in enumerate(ucn_fnames) if i not in filt]
 
     if saveyn==1:
         print('saving...')
+        fnames = []
         for i,tim in enumerate(totims):
-            np.save(dirname.joinpath('conc_mat_totim' + str(int(tim)) + '.npy'),conc_mat_filt[i,:,:,:,:])
-
+            fnames.append('conc_mat_totim' + str(int(tim)) + '.npy')
+            np.save(dirname.joinpath(fnames[i]),conc_mat_filt[i,:,:,:,:])
         save_obj(dirname,ucn_names_filt,'ucn_fnames')
+        save_obj(dirname,filt,'filt')
         print('...done!')
-        return
+        return fnames
     else:
         return conc_mat
 

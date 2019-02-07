@@ -17,8 +17,14 @@ end
 %load hausdorff matrix
 exptdir = '/Users/ianpg/Dropbox/TempShared/MC_expt_2019-01-08-02-50';
 finput = 'hausdorff.mat';
+printplotsyn = true;
 %fhausdorff = 'hausdorff.csv';
 load(fullfile(exptdir,finput));
+try
+    load(fullfile(exptdir,'culled.mat'));
+catch
+    pass
+end
 %% 
 sz = size(hausdorff_mat);
 if sz(1)~=sz(2)
@@ -72,10 +78,10 @@ for i=1:12
         legend;
     end
 end
-%% 4. Compute & display main effects
+%% 4. Cluster and Compute Main Effects
 
 % 4.1 Inputs for clustering and display options.
-DGSA.Nbcluster=3; % # of clusters
+DGSA.Nbcluster=4; % # of clusters
 DGSA.MainEffects.Display.ParetoPlotbyCluster=1; % if true, main effects over cluster will be displayed with Pareto plot.
 DGSA.MainEffects.Display.StandardizedSensitivity='CI'; 
 
@@ -90,13 +96,49 @@ SigLevel_CI=[.95,.9,1]; % This is needed only when you want to display confidenc
 
 % 4.3 Perform clustering
 DGSA.Clustering=kmedoids(DGSA.D,DGSA.Nbcluster,10); % In this example, K medoid clustering is applied.
+medoids = DGSA.Clustering.medoids;
+save(fullfile(exptdir,'medoids.mat'),'medoids')
+med_mats = culled_conc_mat(medoids,:,:,:);
 
-% 4.4 Compute Main Effects
+%%
+%Plot MDS results and representative plots
+[ClusterColor,pts]=DisplayMDSplot(DGSA.D, DGSA.Clustering);
+title('MDS Plot: Clustering by response')
+DGSA.Clustering.ClusterColor = ClusterColor;
+ax= gca;
+ax_pos = ax.Position;
+pts.MarkerFaceColor = 'flat';
+pts.MarkerEdgeColor = 'flat';
+hold on
+w_h = .175;
+pos = [.15,.5,w_h,w_h;
+       .25,.7,w_h,w_h;
+       .45,.75,w_h,w_h;
+       .65,.7,w_h,w_h;
+       .8,.6,w_h,w_h];
+ 
+for i=1:length(medoids)
+    [~,sortind] = sort(pts.XData(medoids));
+    ax2 = axes('Position',pos(sortind(i),:),'Color','none');
+    imagesc(squeeze(med_mats(i,:,1,:)));
+    ax2.XTickLabel='';
+    ax2.YTickLabel='';
+end
+if printplotsyn 
+    print(fullfile(exptdir,'clustering'),'-dtiff','-r200')
+end
+%% 4.4 Compute Main Effects
 DGSA=ComputeMainEffects(DGSA,SigLevel_CI); % If you use Pareto plot or do not want to display main effects, remove SigLevel_CI, otherwise it shows an error.
+if printplotsyn 
+    print(fullfile(exptdir,'maineffects'),'-dtiff','-r150')
+end
+%% 4.5 Display cdfs
 
-%% Display cdfs
+cdf_MainFactor(DGSA.ParametersValues, DGSA.Clustering, DGSA.ParametersNames,{'al','hk'}); %last arg can be cell of params e.g. {'al','vka'}
+if printplotsyn 
+    %print(strcat(exptdir,'/cdfs'),'-dtiff','-r150')
+end
 
-cdf_MainFactor(DGSA.ParametersValues, DGSA.Clustering, DGSA.ParametersNames); %last arg can be cell of params e.g. {'al','vka'}
 %% 5. Compute & Display conditional effects
 
 % 5.1 Specify additional variables to estimate conditional effects.
@@ -116,7 +158,7 @@ DGSA.ConditionalEffects.Display.StandardizedSensitivity='Hplot'; % If omitted Pa
 %%
 % Visualize conditional effects
 DisplayConditionalEffects(DGSA,DGSA.ConditionalEffects.Display.StandardizedSensitivity)
-
+%%
 % 5.4 Display class condtional CDFs
 cdf_ConditionalEffects('hk','vka',DGSA,1)
 
