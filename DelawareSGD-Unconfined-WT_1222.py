@@ -18,7 +18,7 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 1000
+tot_it = 2
 
 # run installed version of flopy or add local path
 try:
@@ -204,6 +204,62 @@ def rand_clay_blocks(lithmat,hkClay,numblocks,sizeblocks):
         lithmat_blocks[block_coords] = hkClay
     return lithmat_blocks
 
+
+def get_yn_response(prompt):
+    while True:
+        try:
+            resp = str(input(prompt))
+        except ValueError:
+            print("Sorry, I didn't understand that.")
+            continue
+        if resp[0] is 'y':
+            value = True
+            break
+        elif resp[0] is 'n':
+            value = False
+            break
+        else:
+            print('This didnt work right. Try again')
+            continue
+    return value
+
+def get_value(prompt):
+    while True:
+        try:
+            resp = str(input(prompt))
+            break
+        except ValueError:
+            print("Sorry, I didn't understand that.")
+            continue
+    return resp
+
+def check_MC_inputParams():
+    if m.MC_file is not None:
+        use_existing_MCfile = get_yn_response("m.MC_file already exists, continue using this experiment?")
+    else:
+        use_existing_MCfile = False
+    if use_existing_MCfile:
+        if m.inputParams is not None:
+            if len(m.inputParams)>0:
+                add_to_inputParams = get_yn_response("m.inputParams already has entries, do you want to add to it?")
+            else:
+                add_to_inputParams =False
+            if add_to_inputParams:
+                pass
+            else: 
+                m.inputParams = {}
+        else:
+            m.inputParams = {}
+    else:
+        load_existing_MCfile = get_yn_response("load MC file?")
+        if load_existing_MCfile:
+            f = get_value("path to MC_file (path/to/test.expt): ")
+            m.inputParams = load_obj(Path(f),'inputParams')
+            print('loaded .pkl file!')
+        else:
+            create_MC_file()
+            m.inputParams = {}
+    return
 
 # In[ ]:
 
@@ -910,9 +966,12 @@ except:
 #Run model
 import datetime
 ts = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
-v = m.run_model(silent=False, report=True)
-for idx in range(-3, 0):
-    print(v[1][idx])
+
+run_basemodel = get_yn_response("Run the base case model?")
+if run_basemodel:
+    v = m.run_model(silent=False, report=True)
+    for idx in range(-3, 0):
+        print(v[1][idx])
 
 
 # ## Post-processing results
@@ -1009,27 +1068,6 @@ def plot_mas(m):
     plt.show()
     return mas
 
-
-# In[18]:
-
-# Extract final timestep heads
-per = -2
-fname = os.path.join(model_ws, '' + modelname + '.hds')
-hdobj = flopy.utils.binaryfile.HeadFile(fname)
-times = hdobj.get_times()
-print('Head object kstpkper:',hdobj.get_kstpkper())
-hds = hdobj.get_data(totim=times[per])
-hds[np.where(ibound != 1)] = np.nan
-
-# Extract final timestep salinity
-fname = os.path.join(model_ws, 'MT3D001.UCN')
-ucnobj = flopy.utils.binaryfile.UcnFile(fname)
-times = ucnobj.get_times()
-kstpkper = ucnobj.get_kstpkper()
-conc = ucnobj.get_data(totim=times[per])
-conc[np.where(ibound != 1)] = np.nan
-
-
 # ## MC experiment
 # Rerun model, select new parameter value for each input param and record.
 
@@ -1073,76 +1111,13 @@ def copy_rename(src_file, dst_file):
     shutil.copy(str(Path(src_file)),str(Path(dst_file)))
     return
 
-
-# In[22]:
-
-def get_yn_response(prompt):
-    while True:
-        try:
-            resp = str(input(prompt))
-        except ValueError:
-            print("Sorry, I didn't understand that.")
-            continue
-        if resp[0] is 'y':
-            value = True
-            break
-        elif resp[0] is 'n':
-            value = False
-            break
-        else:
-            print('This didnt work right. Try again')
-            continue
-    return value
-
-def get_value(prompt):
-    while True:
-        try:
-            resp = str(input(prompt))
-            break
-        except ValueError:
-            print("Sorry, I didn't understand that.")
-            continue
-    return resp
-
-def check_MC_inputParams():
-    if m.MC_file is not None:
-        use_existing_MCfile = get_yn_response("m.MC_file already exists, continue using this experiment?")
-    else:
-        use_existing_MCfile = False
-    if use_existing_MCfile:
-        if m.inputParams is not None:
-            if len(m.inputParams)>0:
-                add_to_inputParams = get_yn_response("m.inputParams already has entries, do you want to add to it?")
-            else:
-                add_to_inputParams =False
-            if add_to_inputParams:
-                pass
-            else: 
-                m.inputParams = {}
-        else:
-            m.inputParams = {}
-    else:
-        load_existing_MCfile = get_yn_response("load MC file?")
-        if load_existing_MCfile:
-            f = get_value("path to MC_file (path/to/test.expt): ")
-            m.inputParams = load_obj(Path(f),'inputParams')
-            print('loaded .pkl file!')
-        else:
-            create_MC_file()
-            m.inputParams = {}
-    return
-
 def idx2centroid(node_coord_tuple,idx_tuple):
     z_pt = node_coord_tuple[2][idx_tuple]
     x_pt = node_coord_tuple[1][idx_tuple[2]]
     y_pt = node_coord_tuple[0][idx_tuple[1]]
     return (z_pt,y_pt,x_pt)
 
-
-# ### Run the MC experiment:
-
-# In[23]:
-
+#Run the MC Experiment
 from scipy.io import savemat
 
 def run_MC(tot_it):
@@ -1292,24 +1267,28 @@ def run_MC(tot_it):
         import datetime
         sep = '-'
         ts = datetime.datetime.now().strftime('%m'+sep+'%d'+sep+'%H'+sep+'%M'+sep+'%S')
-        ts_hms = ts.split(sep)[2:]
+        ts_hms = ts.split(sep)[1:]
         ts_hms = sep.join(ts_hms)
-
+        
         #Run model
         v = m.run_model(silent=True, report=True)
-        for idx in range(-3, 0):
+        for idx in range(-3, 0): #Report
             print(v[1][idx])
-
-        #Record final salinity as .npy, also move full CBC and UCN files to expt folder
-        _ = record_salinity(m,ts_hms=ts_hms);
-        copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
-        #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
-
+        if v[0] is False:  
+            #Remove inputParmas if not converged
+            for k,v in m.inputParams.items():
+                m.inputParams[k] = v[:-1]
+        else:
+            #Record final salinity as .npy, also move full CBC and UCN files to expt folder
+            _ = record_salinity(m,ts_hms=ts_hms);
+            copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
+            #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
         print('Finished iteration ',it,'out of ',tot_it)
     #Save inputParams immediately to prevent accidental destruction of them
     savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),m.inputParams)
     np.save(m.MC_file.parent.joinpath('inputParams.npy'),m.inputParams)
     save_obj(m.MC_file.parent,m.inputParams,'inputParams')
+    save_obj(m.MC_file.parent, m.dis.get_node_coordinates(),'yxz')
     return m.inputParams
 
 
@@ -1318,13 +1297,16 @@ def run_MC(tot_it):
 ####Run the MC experiment ####
 
 inputParams = run_MC(tot_it)
-
-####Run the MC experiment ####
-
+print('Done running all simulations!')
+print('All data stored in \n {}'.format(str(m.MC_file.parent)))
 
 # In[ ]:
 
-
+import hausdorff_from_dir
+fnames = hausdorff_from_dir.create_concmat_from_ucndir(m.MC_file.parent)
+for name in fnames:
+    conc_mat = np.load(name)
+    hausdorff_from_dir.compute_export_hausdorff(m.MC_file.parent,conc_mat)
 
 
 # In[25]:
@@ -1371,7 +1353,7 @@ inputDF
 
 '''
 # In[28]:
-
+'''
 import glob
 
 #make a point cloud for each conc array
@@ -1473,19 +1455,4 @@ for i in range(conc_mat.shape[0]):
                                (conc_mat[i]>salthresh[k]*(1-tol[k])),conc_mat[i])
         plt.imshow(mskd[:,rowslice,:])
         plt.title('Masked points from iter. ' + str(i))
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
+'''
