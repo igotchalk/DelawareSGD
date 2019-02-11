@@ -197,14 +197,10 @@ def add_recharge_cells(recharge_generator,const=1,*args):
         rech_data[i] = rech_array
     return rech_data
 
-def sample_dist(distclass,size,writeyn=0,model=None,varname=None,log_backtransf=0,*args):
+def sample_dist(distclass,size,*args):
     smp = distclass.rvs(*args,size=size)
-    if log_backtransf==1:
-        smp = tuple([10**x for x in smp])
     if size==1:
         smp=smp[-1]
-    if writeyn==1:
-        write_sample(model.MC_file,varname,distclass,smp)
     return smp
 
 def write_sample(fname,varname,distclass,sample):
@@ -247,21 +243,27 @@ except:
     fpth = os.path.abspath(os.path.join('..', '..'))
     sys.path.append(fpth)
     import flopy
-import SGD
 
 print(sys.version)
 print('numpy version: {}'.format(np.__version__))
 print('flopy version: {}'.format(flopy.__version__))
 
+
 if sys.platform == "darwin":
+    repo = Path('/Users/ianpg/Documents/ProjectsLocal/DelawareSGD')
     model_ws = os.path.join('/Users/ianpg/Documents/ProjectsLocal/DelawareSGD','work',modelname)
 elif sys.platform == "win32":
+    repo = Path('E:\Projects\DelawareSGD')
     model_ws = os.path.join('E:\Projects\DelawareSGD','work',modelname)
+
+sys.path.append(repo)
+import SGD
+import config
 
 if not os.path.exists(model_ws):
     os.makedirs(model_ws)
 sys.path.append(os.path.join(model_ws,'..','..'))
-import config
+
 sw_exe = config.swexe #set the exe path for seawat
 print('Model workspace:', os.path.abspath(model_ws))
 
@@ -338,11 +340,11 @@ hkClay = hkSand*.01
 
 heterogenous = True
 mu = np.log(hkSand)
-sill = 1
+sill = .1
 modeltype = 'Exponential'
 llay = int(20/np.mean(delv))
-lrow = int(500/delc)
-lcol = int(700/delr)
+lrow = int(2000/delc)
+lcol = int(2000/delr)
 
 
 if heterogenous:
@@ -353,12 +355,14 @@ else:
     hk = hkSand*np.ones((nlay,nrow,ncol), dtype=np.int32)
 
 grid = np.log10(fft_grid)
-lith_props = [0.2,0.5,0.3]
-hk_vals = [-1,0,2]
+#lith_props = [0.2,0.5,0.3]
+#hk_vals = [-1,0,2]
+lith_props = [0.2,0.8]
+hk_vals = [0,2]
+
 log10trans = True
 plotyn= True
 hk = truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=plotyn)
-
 
 
 #plt.figure(),plt.imshow((hk[:,0,:])),plt.colorbar(),plt.title('Sill:{}'.format(sill)),plt.show()
@@ -726,7 +730,7 @@ vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1,
 # In[11]:
 
 printyn = 0
-gridon=1
+gridon=0
 rowslice=0
 rowslice=farm_orig[0][0]
 m.plot_hk_ibound(rowslice=rowslice,printyn=printyn,gridon=gridon);
@@ -869,7 +873,7 @@ def extract_hds_conc(per):
 
 # Make head and quiver plot
 import utils
-def basic_plot(per,backgroundplot,rowslice=0,printyn=0,**kwargs):
+def basic_plot(per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
     printyn = 1
 
     f, axs = plt.subplots(1, figsize=(6, 2))
@@ -882,8 +886,9 @@ def basic_plot(per,backgroundplot,rowslice=0,printyn=0,**kwargs):
     #Plot background
     backgroundpatch,lbl = cpatchcollection,label = plot_background(mm,backgroundplot,'conc(g/L)')
     lvls = Cfresh + (Csalt-Cfresh)*np.array([.05,.5,.95])
-    CS = mm.contour_array(conc,head=hds,levels=lvls,colors='white')
-    plt.clabel(CS, CS.levels, inline=True, fontsize=10)
+    if contoursyn==1:
+        CS = mm.contour_array(conc,head=hds,levels=lvls,colors='white')
+        plt.clabel(CS, CS.levels, inline=True, fontsize=10)
 
     #mm.contour_array(hds,head=hds)
     mm.plot_ibound()
@@ -915,10 +920,8 @@ mas = plot_mas(m)
 rowslice = 1
 for p in per:
     conc,hds = extract_hds_conc(p)
-    basic_plot(p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=1)
-
-
-
+    basic_plot(p,hk,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
+m.plot_hk_ibound(rowslice=rowslice,gridon=0)
 # In[21]:
 
 def add_to_paramdict(paramdict,paramname,val):
@@ -1034,8 +1037,10 @@ def run_MC(tot_it):
     it = 0
     while it < tot_it:
         ssm_data = {}
-
         it += 1
+        
+        
+        ''' HOMOGENOUS ONLY
         ##hk: hk
         #      Uniform (1,100)
         low= 1e-1
@@ -1043,6 +1048,87 @@ def run_MC(tot_it):
         parname='hk'
         hk = sample_dist(sts.uniform,1,1,m,'hk',0,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,hk)
+        '''
+#########HETEROGENOUS ONLY ##############
+        #hk1
+        low= -3
+        high = 0
+        parname='hk1'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        hk1 = 10**val
+        
+        #hk2
+        low= 1
+        high = 3
+        parname='hk2'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        hk2 = 10**val
+        
+        #lith_prop
+        low= 0
+        high = 0.5
+        parname='lith_prop'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        lith_prop = val
+        
+        #vario_type
+        parname='vario_type'
+        val = int(round(np.random.rand()))
+        add_to_paramdict(m.inputParams,parname,val)
+        if val==1:
+            vario_type = 'Gaussian'
+        elif val==0:
+            vario_type = 'Exponential'
+        else:
+            pass
+
+        #corr_len
+        low= 250
+        high = 1000
+        parname='corr_len'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        corr_len = val
+        
+        #corr_len_zx
+        # equal to lz/lx
+        low= .01
+        high = .1
+        parname='corr_len_zx'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        corr_len_zx = val
+        
+        #corr_len_yx
+        # equal to ly/lx
+        low= 0.1
+        high = 1
+        parname='corr_len_yx'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        corr_len_yx = val
+
+        
+        #Create hk grid
+        mu = np.log(hkSand)
+        sill = 1
+        lcol = int(corr_len/delr)
+        llay = int(corr_len*corr_len_zx/np.mean(delv))
+        lrow = int(corr_len*corr_len_yx/delc)
+        fft_grid = np.exp(simulationFFT.simulFFT(nrow, nlay, ncol, mu, sill, vario_type, lrow , llay, lcol))
+        grid = np.log10(fft_grid)
+        lith_props = [lith_prop,1-lith_prop]
+        hk_vals = [hk1,hk2]
+        plotyn= True
+        hk = truncate_grf(grid,lith_props,hk_vals,log10trans=False,plotyn=plotyn)
+
+
+######## END OF HETEROGENOUS BLOCK ############
+
+''' NOTE TO SELF: NEED TO UPDATE sample_dist() arguments below since changing the function'''
 
         ##vka: ratio of vk/hk
         #      Uniform (1/20,1)

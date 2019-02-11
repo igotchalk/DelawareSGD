@@ -287,14 +287,19 @@ class ModelSGD(Seawat):
         hk = self.get_package('LPF').hk.array
 
         # Make plot of the grid
-        f = plt.figure(figsize=(15, 5))
+        '''
+        f = plt.figure(figsize=(6, 2))
         plt.clf()
         ax = f.add_subplot(1, 1, 1)
+        '''
+        f, ax = plt.subplots(1, figsize=(6, 2))
+        plt.tight_layout()
+
         mm = flopy.plot.ModelCrossSection(ax=ax, model=self, line={'row':rowslice});
         hkpatchcollection = mm.plot_array(hk, norm=matplotlib.colors.LogNorm(),
-                                          vmin=np.min(hk), vmax=np.max(hk),cmap='Greys');
+                                          vmin=np.min(hk), vmax=np.max(hk),cmap='Greys_r');
         if gridon==1:
-            linecollection = mm.plot_grid();
+            mm.plot_grid();
         patchcollection = mm.plot_ibound(color_ch='orange');
         itype = flopy.mt3d.Mt3dSsm.itype_dict()
         for ftype in list(itype.keys()):
@@ -314,15 +319,19 @@ class ModelSGD(Seawat):
         '''
         plt.ylabel('Elevation (m)')
         plt.xlabel('Distance (m)')
+        plt.title('K-field & Boundary conditions');
+        #align plots and set colorbar
+        f.subplots_adjust(left=.1,right=0.88)
+
         if patchcollection:
             cb = plt.colorbar(patchcollection);
             cb.set_label('Boundary condition',rotation=90)
             cb.set_ticks((1.5,2.5))
             #cb.set_ticklabels(('No flow','Const head'))
             cb.ax.set_yticklabels(('No flow','Const head'),rotation=90)
-        cb2 = plt.colorbar(hkpatchcollection,ax=ax);
+        cbar_ax = f.add_axes([0.90, 0.12, 0.02, 0.7])
+        cb2 = plt.colorbar(hkpatchcollection,cax=cbar_ax);
         cb2.set_label('Kh (m/d)', rotation=90)
-        plt.title('K-field & Boundary conditions');
         if printyn==1:
             fname=os.path.join(self.model_ws, self.name + '_BC_Hk.png')
             plt.savefig(fname,dpi=dpi)

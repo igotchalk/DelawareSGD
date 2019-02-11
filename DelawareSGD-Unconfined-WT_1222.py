@@ -3,8 +3,8 @@
 
 # # Delaware Case Study
 # ## Simple Model of SGD
-#
-#
+# 
+# 
 
 # In[1]:
 import os
@@ -18,7 +18,7 @@ import warnings
 import scipy.stats as sts
 #Name model
 modelname = 'homogenous'
-tot_it = 200
+tot_it = 2
 
 # run installed version of flopy or add local path
 try:
@@ -47,7 +47,7 @@ print('Model workspace:', os.path.abspath(model_ws))
 
 
 # ### Utility functions
-#
+# 
 
 # In[2]:
 
@@ -60,7 +60,7 @@ def save_obj(dirname,obj,name):
     import pickle
     with open(Path(dirname).joinpath(name + '.pkl').as_posix(), 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
+    
 #Create new MC_file
 def create_MC_file():
     import datetime
@@ -90,7 +90,7 @@ def loc_to_col(locs):
 def get_line(start, end,allrows=1,nrow=None):
     """Bresenham's Line Algorithm
     Produces a list of tuples from start and end
-
+ 
     >>> points1 = get_line((0, 0), (3, 4))
     >>> points2 = get_line((3, 4), (0, 0))
     >>> assert(set(points1) == set(points2))
@@ -104,30 +104,30 @@ def get_line(start, end,allrows=1,nrow=None):
     x2, y2 = end
     dx = x2 - x1
     dy = y2 - y1
-
+ 
     # Determine how steep the line is
     is_steep = abs(dy) > abs(dx)
-
+ 
     # Rotate line
     if is_steep:
         x1, y1 = y1, x1
         x2, y2 = y2, x2
-
+ 
     # Swap start and end points if necessary and store swap state
     swapped = False
     if x1 > x2:
         x1, x2 = x2, x1
         y1, y2 = y2, y1
         swapped = True
-
+ 
     # Recalculate differentials
     dx = x2 - x1
     dy = y2 - y1
-
+ 
     # Calculate error
     error = int(dx / 2.0)
     ystep = 1 if y1 < y2 else -1
-
+ 
     # Iterate over bounding box generating points between start and end
     y = y1
     points = []
@@ -145,7 +145,7 @@ def get_line(start, end,allrows=1,nrow=None):
         if error < 0:
             y += ystep
             error += dx
-
+ 
     # Reverse the list if the coordinates were swapped
     if swapped:
         points.reverse()
@@ -172,11 +172,11 @@ def shade_above(nlay,nrow,ncol,point_list,third_dim=1):
                 ocean_hf[2].astype('int'),
                 ocean_hf[3])
     return grd,ocean_hf
-'''
+
 def get_ocean_right_edge(m,ocean_line_tuple):
     import numpy as np
     point_list = []
-
+    
     #If there is no vertical side boundary, return bottom-right corner node
     if len(ocean_line_tuple)==0:
         startlay = 0
@@ -187,25 +187,6 @@ def get_ocean_right_edge(m,ocean_line_tuple):
     for lay in range(startlay,m.nlay):
         for row in range(m.nrow):
             point_list.append((lay,row,m.ncol-1))
-    point_list = tuple(np.array(point_list).T)
-    return point_list
-'''
-def get_ocean_right_edge(m,ocean_line_tuple,startlay=None,col=None):
-    import numpy as np
-    point_list = []
-    if col is None:
-        col = m.ncol-1
-    #If there is no vertical side boundary, return bottom-right corner node
-    if len(ocean_line_tuple)==0:
-        if startlay is None:
-            startlay = 0
-    elif max(ocean_line_tuple[0])==m.nlay:
-        startlay = m.nlay
-    elif max(ocean_line_tuple[0])<m.nlay:
-        startlay = max(ocean_line_tuple[0])
-    for lay in range(startlay,m.nlay):
-        for row in range(m.nrow):
-            point_list.append((lay,row,col))
     point_list = tuple(np.array(point_list).T)
     return point_list
 
@@ -224,6 +205,62 @@ def rand_clay_blocks(lithmat,hkClay,numblocks,sizeblocks):
     return lithmat_blocks
 
 
+def get_yn_response(prompt):
+    while True:
+        try:
+            resp = str(input(prompt))
+        except ValueError:
+            print("Sorry, I didn't understand that.")
+            continue
+        if resp[0] is 'y':
+            value = True
+            break
+        elif resp[0] is 'n':
+            value = False
+            break
+        else:
+            print('This didnt work right. Try again')
+            continue
+    return value
+
+def get_value(prompt):
+    while True:
+        try:
+            resp = str(input(prompt))
+            break
+        except ValueError:
+            print("Sorry, I didn't understand that.")
+            continue
+    return resp
+
+def check_MC_inputParams():
+    if m.MC_file is not None:
+        use_existing_MCfile = get_yn_response("m.MC_file already exists, continue using this experiment?")
+    else:
+        use_existing_MCfile = False
+    if use_existing_MCfile:
+        if m.inputParams is not None:
+            if len(m.inputParams)>0:
+                add_to_inputParams = get_yn_response("m.inputParams already has entries, do you want to add to it?")
+            else:
+                add_to_inputParams =False
+            if add_to_inputParams:
+                pass
+            else: 
+                m.inputParams = {}
+        else:
+            m.inputParams = {}
+    else:
+        load_existing_MCfile = get_yn_response("load MC file?")
+        if load_existing_MCfile:
+            f = get_value("path to MC_file (path/to/test.expt): ")
+            m.inputParams = load_obj(Path(f),'inputParams')
+            print('loaded .pkl file!')
+        else:
+            create_MC_file()
+            m.inputParams = {}
+    return
+
 # In[ ]:
 
 
@@ -235,6 +272,10 @@ def rand_clay_blocks(lithmat,hkClay,numblocks,sizeblocks):
 #Grid: 0.5 *1*1m • Size:70m*20m
 
 Lx = 3000.
+Ly = 1000.
+Lz = 80.
+
+Lx = 3000.
 Ly = 600.
 Lz = 80.
 
@@ -242,9 +283,9 @@ xul=488930.5-3 #minimum x value - 3
 yul=4271464.0-32 #minimum y value -32 to place in front of breakwater
 rotation=0
 
-henry_top = 0
+henry_top = 3
 ocean_elev = 0
-delv_first = Lz/nlay
+delv_first = 5
 
 
 botm_first = henry_top-delv_first
@@ -291,13 +332,7 @@ tsmult = 1.8
 ssm_data = None
 verbose = True
 
-print('Model setup: \n'
-      'nlay: {}\n'
-      'nrow: {}\n'
-      'ncol: {}\n'
-      'Total cells: {}\n'
-      'Total time: {} days\n'
-      'nper: {}\n'.format(nlay,nrow,ncol,nlay*nrow*ncol,Lt,nper))
+
 # In[ ]:
 
 
@@ -336,26 +371,19 @@ dis = flopy.modflow.ModflowDis(m, nlay, nrow, ncol, nper=nper, delr=delr,
 
 # In[5]:
 
-#Hydraulic conductivity field
+#Hydraulic conductivity field 
 hkSand = 80.  #horizontal hydraulic conductivity m/day
-hkClay = 1.
-
+hkClay = 1. 
+lithmat = hkSand*np.ones((nlay,nrow,ncol), dtype=np.int32) #sandy background
 addclay_yn = 0
-heterogenous = False
-mu = np.log(hkSand)
-sill = .01
-modeltype = 'Exponential'
-llay = 6
-lrow = 6
-lcol = 10
-if heterogenous:
-    import simulationFFT
-    hk = np.exp(simulationFFT.simulFFT(nrow, nlay, ncol, mu, sill, modeltype, lrow , llay, lcol))
-    hk[0:int(np.where(henry_botm==find_nearest(henry_botm,ocean_elev))[0])+1,:,:] = hkSand
-else:
-    hk = np.ones((nlay,nrow,ncol))*hkSand #sandy background
 
+#add random low conductivity regions
+if addclay_yn == 1:
+    lithmat = rand_clay_blocks(lithmat,hkClay,100,(2,1,5))
 
+#Set Hydraulic properties
+
+hk = lithmat
 sy = 0.15
 ss = 0.00005
 por = 0.2
@@ -367,32 +395,48 @@ dmcoef = 2e-9 #m2/day  from Walther et al. 2017
 Csalt = 35.0001
 Cfresh = 0.
 densesalt = 1025.
-densefresh = 500.
+densefresh = 1000.
 denseslp = (densesalt - densefresh) / (Csalt - Cfresh)
 #denseslp = 0 #trick for testing constant density
 
-#plt.figure(),plt.imshow(np.rot90(hk[:,0,:])),plt.colorbar(),plt.title('Sill:{}'.format(sill)),plt.show()
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
 
 
 # In[6]:
 
-def add_pumping_wells(wel_data,ssm_data,n_wells,flx,rowcol,kper,top_lay):
+def add_pumping_wells(wel_data,ssm_data,n_wells,flx,rowcol,kper):
     itype = flopy.mt3d.Mt3dSsm.itype_dict()
-    new_weldata = wel_data.copy()
-    new_ssmdata = ssm_data.copy()
-
-    delv_weight_pct = sum(delv_weight[top_lay:nlay])
+    new_weldata = wel_data
+    new_ssmdata = ssm_data
     for k in range(n_wells):
         row,col = rowcol[k]
         for i in range(nper):
             if i in kper:
-                for j in range(top_lay,nlay):
+                for j in range(nlay):
                     #WEL {stress_period: [lay,row,col,flux]}
-                    new_weldata[i].append([j,row,col,-flx[k]*delv_weight[j]/delv_weight_pct])
+                    new_weldata[i].append([j,row,col,-flx[k]*delv_weight[j]])
                     #SSM: {stress_period: [lay,row,col,concentration,itype]}
                     new_ssmdata[i].append([j,row,col,Cfresh,itype['WEL']]) #since it's a sink, conc. doesn't matter
             else:
-                for j in range(top_lay,nlay):
+                for j in range(nlay):
                     #WEL {stress_period: [lay,row,col,flux]}
                     new_weldata[i].append([j,row,col,0])
                     #SSM: {stress_period: [lay,row,col,concentration,itype]}
@@ -442,6 +486,9 @@ def write_sample(fname,varname,distclass,sample):
     return
 
 
+# In[ ]:
+
+
 
 
 # In[8]:
@@ -449,23 +496,23 @@ def write_sample(fname,varname,distclass,sample):
 #BCs
 bc_ocean = 'GHB'
 bc_right_edge = 'GHB'
-bc_inland = 'GHB'
+bc_inland = 'WEL'
 add_wells = 1
 n_wells = 2
 rech_on = 1
 
-#BC values
+#BC values 
 #Inland
 calc_inland_head = 0 #calculate from hgrad
 #manual_inland_head = henry_top + .1
-manual_inland_head = 0.75
+manual_inland_head = .75
 #influx = hkSand*delr*delv*hgrad*nlay #m^3/day through inland boundary
 influx = 1.41e-7 *Ly*Lz #from Walther et. al 2017
 #influx = 0.015*(delc*nrow)*(delv*nlay)
 
 start_fresh_yn = 1
 
-ocean_shead = [ocean_elev for x in range(len(perlen))]
+ocean_shead = [ocean_elev for x in range(len(perlen))] 
 ocean_ehead = ocean_shead
 
 # save cell fluxes to unit 53
@@ -499,12 +546,6 @@ else:
 
 ocean_line_tuple = tuple(np.array(ocean_line).T) #use this for indexing numpy arrays
 right_edge = get_ocean_right_edge(m,ocean_line_tuple)
-right_edge = get_ocean_right_edge(m,ocean_line_tuple,
-                                  int(np.where(henry_botm==find_nearest(henry_botm,ocean_elev))[0]))
-
-left_edge = get_ocean_right_edge(m,ocean_line_tuple,
-                                  int(np.where(henry_botm==find_nearest(henry_botm,head_inland))[0]),
-                                col=0)
 
 #Create ibound
 ibound,ocean_hf = shade_above(nlay,nrow,ncol,ocean_line) #don't set ibound of ocean
@@ -519,12 +560,22 @@ if bc_right_edge =='CHD':
 
 
 #Set starting heads
+strt = ocean_elev*np.ones((nlay, nrow, ncol),dtype='float') #starting heads
 
 if bc_inland=='CHD':
-    strt = ocean_elev*np.ones((nlay, nrow, ncol),dtype='float') #starting heads
     strt[:,:,0] = head_inland #head inland
+if len(ocean_hf)>0:
+    strt[ocean_hf[0],
+        ocean_hf[1],
+        ocean_hf[2]] = ocean_hf[3] #self-calculate equivalent FW head; this is repeated in CHD/GHB package
+    right_edge_hf = ocean_hf[3][-1] - (densesalt - densefresh)/densefresh*(henry_botm[right_edge[0]] +.5*delv)
 else:
-    strt = min(ocean_elev,head_inland)
+    right_edge_hf = -(densesalt - densefresh)/densefresh*(henry_botm[right_edge[0]] +.5*delv)
+
+strt[right_edge] = right_edge_hf
+#strt[right_edge] = ocean_hf[3][-1] #set right (ocean) edge below the sloped boundary
+#strt[ocean_hf[0][-1] +1:,:,-1] = ocean_hf[3][-1]
+strt = np.zeros((nlay,nrow,ncol),dtype=np.int)
 
 
 #Transport BCs
@@ -538,13 +589,10 @@ else:
 
 if ocean_hf:
     sconc[ocean_hf[0:3]] = Csalt
+sconc[:,:,-1] = Csalt
+sconc[:,:,0] = Cfresh
 
-sconc[ocean_line] = Csalt
-sconc[right_edge] = Csalt
-sconc[left_edge] = Cfresh
-
-
-icbund = np.ones((nlay, nrow, ncol), dtype=np.int)
+icbund = np.ones((nlay, nrow, ncol), dtype=np.int) 
 ### If using SSM, I think we don't need to hold cells as constant concentration
 #icbund[(ibound < 0)] = -1 #constant concentration cells where also constant head
 #icbund[:,:,0] = -1 #right now hold inland boundary to constant concentration
@@ -620,19 +668,13 @@ def make_bc_dicts():
             pass
         #Inland boundary
         if bc_inland=='GHB':
-            for j in range(np.size(left_edge[0])):
-                dat_ghb.append([left_edge[0][j],
-                               left_edge[1][j],
-                               left_edge[2][j],
-                                head_inland,
-                               2*hkSand*delc*delv_vec[left_edge[0][j]]/delr])
-                #SSM: {stress_period: [lay,row,col,concentration,itype]}
-                dat_ssm.append([left_edge[0][j],
-                               left_edge[1][j],
-                               left_edge[2][j],
-                               Cfresh,
-                               itype['GHB']])
-
+            for j in range(nlay):
+                for k in range(nrow):
+                    #GHB: {stress period: [lay,row,col,head level,conductance]}
+                    dat_ghb.append([j,k,0,head_inland,
+                                    2*hkSand*delc*delv_vec[j]/delr])
+                    #SSM: {stress_period: [lay,row,col,concentration,itype]}
+                    dat_ssm.append([j,k,0,Cfresh,itype['GHB']])
         elif bc_inland=='WEL':
             for j in range(nlay):
                 for k in range(nrow):
@@ -649,8 +691,8 @@ def make_bc_dicts():
     #timprs = [k for k in range(1,np.sum(perlen),50)]
     return chd_data, ssm_data, ghb_data, wel_data
 
-chd_data, ssm_data_base, ghb_data, wel_data_base = make_bc_dicts()
-#wel_data_base,ssm_data_base = wel_data,ssm_data
+chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts()
+wel_data_base,ssm_data_base = wel_data,ssm_data
 timprs = np.round(np.linspace(1,np.sum(perlen),20),decimals=0)
 
 create_MC_file()
@@ -658,6 +700,7 @@ save_obj(m.MC_file.parent,wel_data_base,'wel_data_base')
 save_obj(m.MC_file.parent,ssm_data_base,'ssm_data_base')
 
 
+# In[ ]:
 
 
 
@@ -666,13 +709,13 @@ save_obj(m.MC_file.parent,ssm_data_base,'ssm_data_base')
 
 #### ADD WELL AND RECHARRGE DATA####
 #Winter is even stress periods, summer is odd SP.
-#Winter= wells OFF, natural precip (rech) ON, irrigation rech OFF,
-#Summer = wells ON, irrigation rech (farm_rech) ON,  precip (rech) OFF
+#Winter= wells OFF, natural precip (rech) ON, irrigation rech OFF, 
+#Summer = wells ON, irrigation rech (farm_rech) ON,  precip (rech) OFF 
 
 ##Add recharge data
 rech = 1e-6
 
-#Assign the location of the farms
+#Assign the location of the farms 
 farm_leftmargin = 10
 farm_uppermargin = 1
 nfarms = 4
@@ -701,8 +744,7 @@ kper_even = list(np.arange(0,nper,2))
 #wel_lowhigh = np.log10((1e0,1e2))
 #wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(wel_lowhigh[0],wel_lowhigh[1]-wel_lowhigh[0]))
 wel_flux = [1e0,1e0,1e0,1e0]
-top_lay = int(np.where(henry_botm==find_nearest(henry_botm,ocean_elev))[0])+1
-wel_data,ssm_data = add_pumping_wells(wel_data_base.copy(),ssm_data_base.copy(),n_wells,wel_flux,farm_orig,kper_odd,top_lay)
+wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
 
 
 ## Add farm recharge data
@@ -715,17 +757,26 @@ farm_rech[farm_loc] = farm_rech_flux/np.prod(farm_size)
 #Set rech_data for winter and summer
 rech_data = {}
 for i in range(len(perlen)):
-    if i in kper_even:
-        rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech
-    elif i in kper_odd:
-        rech_data[i] = farm_rech
+    if i%2==0:
+        rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech 
+    else:
+        rech_data[i] = farm_rech                            
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
 
 
 
 # In[10]:
 
 riv_loc = get_line((0,0),(0,ncol-1),allrows=1,nrow=nrow)
-riv_loc = [x for x in riv_loc if x[1]==int(nrow/2)]
+riv_loc = [x for x in riv_loc if x[1]==int(nrow/2)] 
 riv_loc = tuple(np.array(riv_loc).T)
 
 riv_grad = .001
@@ -737,7 +788,7 @@ cond = 10
 riv_grad = .001
 
 def write_river_data(riv_loc,stage,cond,riv_grad,kper,ssm_data):
-
+    
     ####ADD RIVER DATA####
     rbot_vec = np.linspace(riv_grad*Lx,ocean_elev,ncol)
 
@@ -796,23 +847,32 @@ riv_data,ssm_data = write_river_data(riv_loc,stage,cond,riv_grad,kper_even,ssm_d
 
 
 # ### Notes on Farm fields
-# North Marina Area:
+# North Marina Area: 
 # Fields can be as close as 400m from the coast!! Others closer to 1.7km
-#
+# 
 # Most fields are about 200x200m, some fields that appear to be row crops (strawberry? lettuce?) are 100x100 or so
-#
+# 
 # Fields are in a 3 distinct patches, each patch is almost completely covered with crops:
-#
+# 
 # -Near coast (400m+), verdant larger plots.
-#
+# 
 # -1.7km inland, pale colored, tight rows
-#
+# 
 # -2.75km inland, larger plots, varied color
-#
-#
+# 
+# 
 # Salinas Valley:
 # Most fields are about 200-250m wide minimum and can be 300-600m long
-#
+# 
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
 
 
 # In[12]:
@@ -836,11 +896,10 @@ rch = flopy.modflow.ModflowRch(m, rech=rech_data)
 riv = flopy.modflow.ModflowRiv(m, stress_period_data=riv_data)
 
 # Add LPF package to the MODFLOW model
-lpf = flopy.modflow.ModflowLpf(m, hk=hk, vka=vka, ipakcb=ipakcb,
-                               laytyp=1,laywet=1,ss=ss,sy=sy)
+lpf = flopy.modflow.ModflowLpf(m, hk=hk, vka=vka, ipakcb=ipakcb,laytyp=1)
 
 # Add PCG Package to the MODFLOW model
-pcg = flopy.modflow.ModflowPcg(m, hclose=1e-8)
+pcg = flopy.modflow.ModflowPcg(m, hclose=1.e-8)
 
 # Add OC package to the MODFLOW model
 oc = flopy.modflow.ModflowOc(m,
@@ -848,19 +907,27 @@ oc = flopy.modflow.ModflowOc(m,
                              compact=True)
 
 #Create the basic MT3DMS model structure
-#Create the basic MT3DMS model structure
-btn = flopy.mt3d.Mt3dBtn(m,
-                         laycon=lpf.laytyp, htop=henry_top,
-                         dz=dis.thickness.get_value(), prsity=por, icbund=icbund,
+btn = flopy.mt3d.Mt3dBtn(m, 
+                         laycon=lpf.laytyp, htop=henry_top, 
+                         dz=dis.thickness.get_value(), prsity=0.2, icbund=icbund,
                          sconc=sconc, nprs=1,timprs=timprs)
 adv = flopy.mt3d.Mt3dAdv(m, mixelm=-1)
 dsp = flopy.mt3d.Mt3dDsp(m, al=al, dmcoef=dmcoef)
 gcg = flopy.mt3d.Mt3dGcg(m, iter1=50, mxiter=1, isolve=1, cclose=1e-5)
-ssm = flopy.mt3d.Mt3dSsm(m, stress_period_data=ssm_data_base)
+ssm = flopy.mt3d.Mt3dSsm(m, stress_period_data=ssm_data)
 
 #vdf = flopy.seawat.SeawatVdf(m, iwtable=0, densemin=0, densemax=0,denseref=1000., denseslp=0.7143, firstdt=1e-3)
-vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1,
+vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1, 
                              densemin=0., densemax=0., denseslp=denseslp, denseref=densefresh)
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
 
 
 
@@ -899,9 +966,12 @@ except:
 #Run model
 import datetime
 ts = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
-v = m.run_model(silent=False, report=True)
-for idx in range(-3, 0):
-    print(v[1][idx])
+
+run_basemodel = get_yn_response("Run the base case model?")
+if run_basemodel:
+    v = m.run_model(silent=False, report=True)
+    for idx in range(-3, 0):
+        print(v[1][idx])
 
 
 # ## Post-processing results
@@ -914,7 +984,7 @@ def plotdischarge(modelname,model_ws,color='w',per=-1,scale=50,rowslice=0):
     budobj = flopy.utils.CellBudgetFile(fname)
     qx = budobj.get_data(text='FLOW RIGHT FACE')[per]
     qz = budobj.get_data(text='FLOW LOWER FACE')[per]
-
+    
     # Average flows to cell centers
     qx_avg = np.empty(qx.shape, dtype=qx.dtype)
     qx_avg[:, :, 1:] = 0.5 * (qx[:, :, 0:ncol-1] + qx[:, :, 1:ncol])
@@ -922,11 +992,11 @@ def plotdischarge(modelname,model_ws,color='w',per=-1,scale=50,rowslice=0):
     qz_avg = np.empty(qz.shape, dtype=qz.dtype)
     qz_avg[1:, :, :] = 0.5 * (qz[0:nlay-1, :, :] + qz[1:nlay, :, :])
     qz_avg[0, :, :] = 0.5 * qz[0, :, :]
-
+    
     y, x, z = dis.get_node_coordinates()
     X, Z = np.meshgrid(x, z[:, 0, 0])
     iskip = 1 #how many cells to skip, 1 means plot every cell
-
+    
     ax = plt.gca()
     cpatchcollection = ax.quiver(X[::iskip, ::iskip], Z[::iskip, ::iskip],
               qx_avg[::iskip, rowslice, ::iskip], -qz_avg[::iskip, rowslice, ::iskip],
@@ -949,7 +1019,7 @@ def permute_kstpkper(ucnobj):
 def kstpkper_from_time(ucnobj,tottim):
     kstpkpers = ucnobj.get_kstpkper()
     times = ucnobj.get_times()
-    timeind = times.index(tottim)
+    timeind = times.index(tottim)    
     kstpkper = kstpkpers[timeind]
     return kstpkper
 
@@ -967,7 +1037,7 @@ def get_salt_outflow(m,kstpkper=None,totim=None):
         kstpkper = ucnobj.get_kstpkper()[-1]
     ocean_conc = ucnobj.get_data(kstpkper=kstpkper)
     return ocean_conc
-
+    
 def plot_background(mm,array,label=None):
     if label==None:
         label = [k for k,v in globals().items() if v is array][-1]
@@ -998,81 +1068,15 @@ def plot_mas(m):
     plt.show()
     return mas
 
-
-# In[18]:
-
-# Extract final timestep heads
-def extract_hds_conc(per):
-    fname = os.path.join(model_ws, '' + modelname + '.hds')
-    hdobj = flopy.utils.binaryfile.HeadFile(fname)
-    times = hdobj.get_times()
-    print('Head object kstpkper:',hdobj.get_kstpkper())
-    hds = hdobj.get_data(totim=times[per])
-    hds[np.where(ibound != 1)] = np.nan
-    hds[np.where( (hds>1e10) | (hds<-1e10))] = np.nan
-
-    # Extract final timestep salinity
-    fname = os.path.join(model_ws, 'MT3D001.UCN')
-    ucnobj = flopy.utils.binaryfile.UcnFile(fname)
-    times = ucnobj.get_times()
-    kstpkper = ucnobj.get_kstpkper()
-    conc = ucnobj.get_data(totim=times[per])
-    conc[np.where(ibound != 1)] = np.nan
-    conc[np.where( (conc>1e10) | (conc<-1e10))] = np.nan
-    return conc,hds
-
-
 # ## MC experiment
 # Rerun model, select new parameter value for each input param and record.
 
 # ### MC functions
 
-# Make head and quiver plot
-import utils
-def basic_plot(per,backgroundplot):
-    printyn = 1
-    rowslice = 0
-
-    f, axs = plt.subplots(1, figsize=(6, 4))
-
-    plt.tight_layout()
-
-    #Plot discharge and ibound
-    mm = flopy.plot.ModelCrossSection(ax=axs, model=m, line={'row':rowslice})
-
-    #Plot background
-    backgroundpatch,lbl = cpatchcollection,label = plot_background(mm,backgroundplot,'conc(g/L)')
-    lvls = Cfresh + (Csalt-Cfresh)*np.array([.05,.5,.95])
-    CS = mm.contour_array(conc,head=hds,levels=lvls,colors='white')
-    plt.clabel(CS, CS.levels, inline=True, fontsize=10)
-
-    #mm.contour_array(hds,head=hds)
-    mm.plot_ibound()
-    mm.plot_bc(ftype='GHB',color='white')
-    if m.Wel:
-        mm.plot_bc(ftype='WEL',color='black')
-    #Plot discharge
-    utils.plotdischarge(m,color='white',per=per,scale=20,rowslice=rowslice,iskip=5);
-    plt.xlabel('Distance (m)')
-    plt.ylabel('Elevation (m)')
-    plt.subplots_adjust(bottom=.1)
-
-    #align plots and set colorbar
-    f.subplots_adjust(left=.1,right=0.88)
-    cbar_ax = f.add_axes([0.90, 0.1, 0.02, 0.7])
-    cb = f.colorbar(cpatchcollection,cax=cbar_ax)
-    cb.set_label(label)
-    if printyn == 1:
-        plt.savefig(os.path.join(m.model_ws, m.name + '_' + ts + '_flowvec_row' + str(rowslice) +
-                                 '_per' + str(per) + '_' + lbl[:3] + '.png'),dpi=150)
-    plt.show()
-    return
-#%%
-per = -1
-conc,hds = extract_hds_conc(per)
-basic_plot(per,conc)
-
 # In[21]:
+
+import scipy.stats as sts
+
 
 def add_to_paramdict(paramdict,paramname,val):
     if paramdict is None:
@@ -1107,76 +1111,13 @@ def copy_rename(src_file, dst_file):
     shutil.copy(str(Path(src_file)),str(Path(dst_file)))
     return
 
-
-# In[22]:
-
-def get_yn_response(prompt):
-    while True:
-        try:
-            resp = str(input(prompt))
-        except ValueError:
-            print("Sorry, I didn't understand that.")
-            continue
-        if resp[0] is 'y':
-            value = True
-            break
-        elif resp[0] is 'n':
-            value = False
-            break
-        else:
-            print('This didnt work right. Try again')
-            continue
-    return value
-
-def get_value(prompt):
-    while True:
-        try:
-            resp = str(input(prompt))
-            break
-        except ValueError:
-            print("Sorry, I didn't understand that.")
-            continue
-    return resp
-
-def check_MC_inputParams():
-    if m.MC_file is not None:
-        use_existing_MCfile = get_yn_response("m.MC_file already exists, continue using this experiment?")
-    else:
-        use_existing_MCfile = False
-    if use_existing_MCfile:
-        if m.inputParams is not None:
-            if len(m.inputParams)>0:
-                add_to_inputParams = get_yn_response("m.inputParams already has entries, do you want to add to it?")
-            else:
-                add_to_inputParams =False
-            if add_to_inputParams:
-                pass
-            else:
-                m.inputParams = {}
-        else:
-            m.inputParams = {}
-    else:
-        load_existing_MCfile = get_yn_response("load MC file?")
-        if load_existing_MCfile:
-            f = get_value("path to MC_file (path/to/test.expt): ")
-            m.inputParams = load_obj(Path(f),'inputParams')
-            print('loaded .pkl file!')
-        else:
-            create_MC_file()
-            m.inputParams = {}
-    return
-
 def idx2centroid(node_coord_tuple,idx_tuple):
     z_pt = node_coord_tuple[2][idx_tuple]
     x_pt = node_coord_tuple[1][idx_tuple[2]]
     y_pt = node_coord_tuple[0][idx_tuple[1]]
     return (z_pt,y_pt,x_pt)
 
-
-# ### Run the MC experiment:
-
-# In[23]:
-
+#Run the MC Experiment
 from scipy.io import savemat
 
 def run_MC(tot_it):
@@ -1187,7 +1128,7 @@ def run_MC(tot_it):
     it = 0
     while it < tot_it:
         ssm_data = {}
-
+        
         it += 1
         ##hk: hk
         #      Uniform (1,100)
@@ -1205,7 +1146,7 @@ def run_MC(tot_it):
         vka = sample_dist(sts.uniform,1,1,m,'vka',0,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,vka)
 
-        ##al: #longitudinal dispersivity (m)
+        ##al: #longitudinal dispersivity (m) 
         #      Uniform [0.1,20] #10 from Walther et al
         low= 0.1
         high = 20
@@ -1213,7 +1154,7 @@ def run_MC(tot_it):
         al = sample_dist(sts.uniform,1,1,m,'al',0,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,al)
 
-        ##dmcoef: #dispersion coefficient (m2/day)
+        ##dmcoef: #dispersion coefficient (m2/day) 
         #      log-uniform [1e-10,1e-5] #2e-9 from Walther et al
         lowhigh = np.log10([1e-10,1e-5])
         parname='dmcoef'
@@ -1231,9 +1172,9 @@ def run_MC(tot_it):
         rech_data = {}
         for i in range(len(perlen)):
             if i%2==0:
-                rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech
+                rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech 
             else:
-                rech_data[i] = farm_rech
+                rech_data[i] = farm_rech 
         parname = 'rech'
         add_to_paramdict(m.inputParams,parname,rech)
         parname = 'farm_rech'
@@ -1245,29 +1186,29 @@ def run_MC(tot_it):
         parname = 'wel'
         for i in range(n_wells):
             parname_temp = parname+str(i)
-            add_to_paramdict(m.inputParams,parname_temp,wel_flux[i])
-
+            add_to_paramdict(m.inputParams,parname_temp,wel_flux[i])    
+        
         #write wel data
         ssm_data_base = load_obj(m.MC_file.parent,'ssm_data_base')
         wel_data_base = load_obj(m.MC_file.parent,'wel_data_base')
-        wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
+        wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)    
 
         ##riv_stg
         parname = 'riv_stg'
         lowhigh = (.5,1.5)
         stage = sample_dist(sts.uniform,1,0,m,'riv_stg',0,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
         add_to_paramdict(m.inputParams,parname,stage)
-
+        
         ##riv_cond
         parname = 'riv_cond'
         lowhigh = np.log10((.1,100))
         cond = sample_dist(sts.uniform,1,0,m,'riv_cond',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
         add_to_paramdict(m.inputParams,parname,cond)
-
+        
         #Write river data--take SSM data from WEL!!
         riv_grad = .0005
-        riv_data,ssm_data = write_river_data(riv_loc,stage,cond,riv_grad,kper_even,ssm_data)
-
+        riv_data,ssm_data = write_river_data(riv_loc,stage,cond,riv_grad,kper_even,ssm_data)            
+            
         ###### Reassign, run record ######
         #Reassign to model object
         #assign_m()
@@ -1292,8 +1233,8 @@ def run_MC(tot_it):
                                      compact=True)
 
         #Create the basic MT3DMS model structure
-        btn = flopy.mt3d.Mt3dBtn(m,
-                                 laycon=lpf.laytyp, htop=henry_top,
+        btn = flopy.mt3d.Mt3dBtn(m, 
+                                 laycon=lpf.laytyp, htop=henry_top, 
                                  dz=dis.thickness.get_value(), prsity=0.2, icbund=icbund,
                                  sconc=sconc, nprs=1,timprs=timprs)
         adv = flopy.mt3d.Mt3dAdv(m, mixelm=-1)
@@ -1302,7 +1243,7 @@ def run_MC(tot_it):
         ssm = flopy.mt3d.Mt3dSsm(m, stress_period_data=ssm_data)
 
         #vdf = flopy.seawat.SeawatVdf(m, iwtable=0, densemin=0, densemax=0,denseref=1000., denseslp=0.7143, firstdt=1e-3)
-        vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1,
+        vdf = flopy.seawat.SeawatVdf(m, mtdnconc=1, mfnadvfd=1, nswtcpl=0, iwtable=1, 
                                      densemin=0., densemax=0., denseslp=denseslp, denseref=densefresh)
 
 
@@ -1326,24 +1267,28 @@ def run_MC(tot_it):
         import datetime
         sep = '-'
         ts = datetime.datetime.now().strftime('%m'+sep+'%d'+sep+'%H'+sep+'%M'+sep+'%S')
-        ts_hms = ts.split(sep)[2:]
+        ts_hms = ts.split(sep)[1:]
         ts_hms = sep.join(ts_hms)
-
+        
         #Run model
         v = m.run_model(silent=True, report=True)
-        for idx in range(-3, 0):
+        for idx in range(-3, 0): #Report
             print(v[1][idx])
-
-        #Record final salinity as .npy, also move full CBC and UCN files to expt folder
-        _ = record_salinity(m,ts_hms=ts_hms);
-        copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
-        #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
-
+        if v[0] is False:  
+            #Remove inputParmas if not converged
+            for k,v in m.inputParams.items():
+                m.inputParams[k] = v[:-1]
+        else:
+            #Record final salinity as .npy, also move full CBC and UCN files to expt folder
+            _ = record_salinity(m,ts_hms=ts_hms);
+            copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
+            #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
         print('Finished iteration ',it,'out of ',tot_it)
     #Save inputParams immediately to prevent accidental destruction of them
     savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),m.inputParams)
     np.save(m.MC_file.parent.joinpath('inputParams.npy'),m.inputParams)
     save_obj(m.MC_file.parent,m.inputParams,'inputParams')
+    save_obj(m.MC_file.parent, m.dis.get_node_coordinates(),'yxz')
     return m.inputParams
 
 
@@ -1352,13 +1297,16 @@ def run_MC(tot_it):
 ####Run the MC experiment ####
 
 inputParams = run_MC(tot_it)
-
-####Run the MC experiment ####
-
+print('Done running all simulations!')
+print('All data stored in \n {}'.format(str(m.MC_file.parent)))
 
 # In[ ]:
 
-
+import hausdorff_from_dir
+fnames = hausdorff_from_dir.create_concmat_from_ucndir(m.MC_file.parent)
+for name in fnames:
+    conc_mat = np.load(name)
+    hausdorff_from_dir.compute_export_hausdorff(m.MC_file.parent,conc_mat)
 
 
 # In[25]:
@@ -1368,18 +1316,18 @@ inputParams = run_MC(tot_it)
     parname = 'wel'
     lowhigh = np.log10((1e1,1e2))
     wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
-    wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
+    wel_data,ssm_data = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)    
     for i in range(n_wells):
         parname_temp = parname+i
         add_to_paramdict(inputParams,parname_temp,wel_flux[i])
-
+    
     ##rech: surface recharge
     # log-uniform (1e-7,1e-3)
     lowhigh = np.log10([1e-7/(nrow*ncol),1e-1/(nrow*ncol)])
     parname = 'rech'
     rech_data = sample_dist(sts.uniform,1,1,m,'rech',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
     add_to_paramdict(inputParams,parname,rech_data)
-
+    
     #### ADD WELL DATA####
     ##wel_data: #well pumping (m/day)
     #      Uniform (1e-2,1e1)
@@ -1405,11 +1353,11 @@ inputDF
 
 '''
 # In[28]:
-
+'''
 import glob
 
 #make a point cloud for each conc array
-conc_fnames = sorted(glob.glob(m.MC_file.parent.joinpath('conc*.npy').as_posix()))
+conc_fnames = sorted(glob.glob(m.MC_file.parent.joinpath('conc*.npy').as_posix()))     
 pct50 = (Csalt+Cfresh)/2
 tol = .20 #percentage
 conc_mat = np.zeros((len(conc_fnames),nlay,nrow,ncol),dtype=float)
@@ -1427,7 +1375,7 @@ for k,v in idx_dict.items():
         print('iteration ',k,'is empty and will be filtered out')
     else:
         idx_dict_filt[i] = v
-        i+=1
+        i+=1  
 
 #Do the same with inputParams dictionary
 i=0
@@ -1438,7 +1386,7 @@ for k,v in m.inputParams.items():
     if i==0:
         N = len(vnew)
     i+=1
-
+    
 yxz = m.dis.get_node_coordinates()
 ptset_dict = {}
 for i in range(len(idx_dict_filt)):
@@ -1481,7 +1429,7 @@ if saveyn==1:
     hdorf_matdict['ParametersValues'] = ParametersValues
     np.save(m.MC_file.parent.joinpath('hausdorff.npy'),hdorf_mat)
     savemat(m.MC_file.parent.joinpath('hausdorff.mat').as_posix(),hdorf_matdict)
-
+    
 plt.imshow(hdorf_mat)
 plt.colorbar()
 plt.title('Modified Hausdorff distance matrix')
@@ -1503,23 +1451,8 @@ for i in range(conc_mat.shape[0]):
         break
     for k in range(len(pctage)):
         plt.figure()
-        mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) &
+        mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) & 
                                (conc_mat[i]>salthresh[k]*(1-tol[k])),conc_mat[i])
         plt.imshow(mskd[:,rowslice,:])
         plt.title('Masked points from iter. ' + str(i))
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
+'''
