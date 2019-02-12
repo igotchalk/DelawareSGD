@@ -1,6 +1,6 @@
 
 # coding: utf-8
-
+%matplotlib inline
 import os
 from pathlib import Path
 import sys
@@ -244,9 +244,6 @@ except:
     sys.path.append(fpth)
     import flopy
 
-print(sys.version)
-print('numpy version: {}'.format(np.__version__))
-print('flopy version: {}'.format(flopy.__version__))
 
 
 if sys.platform == "darwin":
@@ -256,18 +253,22 @@ elif sys.platform == "win32":
     repo = Path('E:\Projects\DelawareSGD')
     model_ws = os.path.join('E:\Projects\DelawareSGD','work',modelname)
 
-sys.path.append(repo)
-import SGD
-import config
-
+if repo.as_posix() not in sys.path:
+    sys.path.append(repo.as_posix())
 if not os.path.exists(model_ws):
     os.makedirs(model_ws)
-sys.path.append(os.path.join(model_ws,'..','..'))
 
+import SGD
+import config
 sw_exe = config.swexe #set the exe path for seawat
+
+
+
+
+print(sys.version)
+print('numpy version: {}'.format(np.__version__))
+print('flopy version: {}'.format(flopy.__version__))
 print('Model workspace:', os.path.abspath(model_ws))
-
-
 #%%
 #Model discretization
 Lx = 3000.
@@ -281,6 +282,7 @@ henry_top = 5
 ocean_elev = 0
 
 delv_first = Lz/nlay
+#delv_first = 5
 botm_first = henry_top-delv_first
 
 delv = (Lz-delv_first) / (nlay-1)
@@ -584,20 +586,21 @@ rech = 1e-6
 farm_leftmargin = 10
 farm_uppermargin = 1
 nfarms = 4
-farm_size = (200,200) #m in row,col direction
+farm_size = (200,200) #size in meters (row,col)
 farm_size_rowcol = (int(farm_size[0]/delc),int(farm_size[1]/delr)) #size of farm in number of row,col
-
-farm_loc_r = []
-farm_loc_c = []
+farm_loc_list = []
 farm_orig = []
 for x in range(int(nfarms/2)):
     for y in range(2):
+        farm_loc_r = []
+        farm_loc_c = []
         for z1 in range(farm_size_rowcol[0]):
             for z2 in range(farm_size_rowcol[1]):
                 farm_loc_r.append(farm_uppermargin + y*(farm_size_rowcol[0]+2) + z1)
                 farm_loc_c.append(farm_leftmargin + x*(farm_size_rowcol[1]+2) + z2)
                 if (z1==0) and (z2==0):
                     farm_orig.append((farm_loc_r[-1],farm_loc_c[-1])) #upper left of ea. farm=loc of well
+        farm_loc_list.append((np.array(farm_loc_r),np.array(farm_loc_c)))
 farm_loc = (np.array(farm_loc_r),np.array(farm_loc_c))
 
 ## Add well data
@@ -611,9 +614,11 @@ hk[wel_cells] = hkSand
 
 
 ## Add farm recharge data
-farm_rech_flux = wel_flux[0]*0.2
+farm_rech_flux = [flx*0.2 for flx in wel_flux]
 farm_rech = np.zeros((nrow,ncol),dtype=np.float)
-farm_rech[farm_loc] = farm_rech_flux/np.prod(farm_size)
+
+for i in range(nfarms):
+    farm_rech[farm_loc_list[i]] = farm_rech_flux[i]/np.prod(farm_size)
 #Set rech_data for winter and summer
 rech_data = {}
 for i in range(len(perlen)):
@@ -920,7 +925,7 @@ mas = plot_mas(m)
 rowslice = 1
 for p in per:
     conc,hds = extract_hds_conc(p)
-    basic_plot(p,hk,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
+    basic_plot(p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
 m.plot_hk_ibound(rowslice=rowslice,gridon=0)
 # In[21]:
 
@@ -1029,7 +1034,7 @@ def idx2centroid(node_coord_tuple,idx_tuple):
 
 from scipy.io import savemat,loadmat
 
-def run_MC(tot_it):
+def run_MC(tot_it,plotyn=False):
     #### MAKE NEW/ADD TO OLD EXPT ####
     check_MC_inputParams()
 
@@ -1038,42 +1043,42 @@ def run_MC(tot_it):
     while it < tot_it:
         ssm_data = {}
         it += 1
-        
-        
+
+
         ''' HOMOGENOUS ONLY
-        ##hk: hk
-        #      Uniform (1,100)
-        low= 1e-1
-        high = 100
+        #hk
+        low,high= (-3,0)
         parname='hk'
-        hk = sample_dist(sts.uniform,1,1,m,'hk',0,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,hk)
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        hk = 10**val
         '''
-#########HETEROGENOUS ONLY ##############
+
+        #########HETEROGENOUS ONLY ##############
         #hk1
-        low= -3
+        low= -2
         high = 0
         parname='hk1'
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
         hk1 = 10**val
-        
+
         #hk2
-        low= 1
-        high = 3
+        low= 0
+        high = 2
         parname='hk2'
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
         hk2 = 10**val
-        
+
         #lith_prop
         low= 0
-        high = 0.5
+        high = 0.3
         parname='lith_prop'
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
         lith_prop = val
-        
+
         #vario_type
         parname='vario_type'
         val = int(round(np.random.rand()))
@@ -1092,7 +1097,7 @@ def run_MC(tot_it):
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
         corr_len = val
-        
+
         #corr_len_zx
         # equal to lz/lx
         low= .01
@@ -1101,7 +1106,7 @@ def run_MC(tot_it):
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
         corr_len_zx = val
-        
+
         #corr_len_yx
         # equal to ly/lx
         low= 0.1
@@ -1111,7 +1116,7 @@ def run_MC(tot_it):
         add_to_paramdict(m.inputParams,parname,val)
         corr_len_yx = val
 
-        
+
         #Create hk grid
         mu = np.log(hkSand)
         sill = 1
@@ -1122,60 +1127,41 @@ def run_MC(tot_it):
         grid = np.log10(fft_grid)
         lith_props = [lith_prop,1-lith_prop]
         hk_vals = [hk1,hk2]
-        plotyn= True
         hk = truncate_grf(grid,lith_props,hk_vals,log10trans=False,plotyn=plotyn)
-
-
-######## END OF HETEROGENOUS BLOCK ############
-
-''' NOTE TO SELF: NEED TO UPDATE sample_dist() arguments below since changing the function'''
+        hk[wel_cells] = hk.max()
+        ######## END OF HETEROGENOUS BLOCK ############
 
         ##vka: ratio of vk/hk
         #      Uniform (1/20,1)
         low= 1/20
         high = 1
         parname='vka'
-        vka = sample_dist(sts.uniform,1,1,m,'vka',0,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,vka)
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        vka = val
 
         ##al: #longitudinal dispersivity (m)
         #      Uniform [0.1,20] #10 from Walther et al
         low= 0.1
         high = 20
         parname='al'
-        al = sample_dist(sts.uniform,1,1,m,'al',0,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,al)
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        al = val
 
         ##dmcoef: #dispersion coefficient (m2/day)
         #      log-uniform [1e-10,1e-5] #2e-9 from Walther et al
-        lowhigh = np.log10([1e-10,1e-5])
+        low,high = np.log10([1e-10,1e-5])
         parname='dmcoef'
-        dmcoef = sample_dist(sts.uniform,1,1,m,'dmcoef',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
-        add_to_paramdict(m.inputParams,parname,dmcoef)
-
-        ##rech
-        rechargs = tuple(np.log10((1e-6/(nrow*ncol),1e-1/(nrow*ncol))))
-        rechargs = (rechargs[0],rechargs[1]-rechargs[0])
-        rech = sample_dist(sts.uniform,1,0,m,'rech',1,*rechargs)
-
-        farm_rechargs = (rechargs[0],rechargs[1]) #note: this is in log space
-        farm_rech_flux = sample_dist(sts.uniform,1,0,m,'rech',1,*farm_rechargs)
-        farm_rech[farm_loc] = farm_rech_flux
-        rech_data = {}
-        for i in range(len(perlen)):
-            if i%2==0:
-                rech_data[i] = np.ones((nrow,ncol),dtype=np.float)*rech
-            else:
-                rech_data[i] = farm_rech
-        parname = 'rech'
-        add_to_paramdict(m.inputParams,parname,rech)
-        parname = 'farm_rech'
-        add_to_paramdict(m.inputParams,parname,farm_rech_flux)
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        dmcoef = 10**val
 
         ##wel
-        lowhigh = np.log10((1e1,1e3))
-        wel_flux = sample_dist(sts.uniform,n_wells,0,m,'wel',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
-        parname = 'wel'
+        low,high = np.log10((1e1,1e3))
+        parname='wel'
+        val = sample_dist(sts.uniform,n_wells,*(low,high-low))
+        wel_flux = val
         for i in range(n_wells):
             parname_temp = parname+str(i)
             add_to_paramdict(m.inputParams,parname_temp,wel_flux[i])
@@ -1185,17 +1171,45 @@ def run_MC(tot_it):
         wel_data_base = load_obj(m.MC_file.parent,'wel_data_base')
         wel_data,ssm_data,_ = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
 
+        ##rech_precip
+        low,high = np.log10([1e-6,1e-1])
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        parname='rech_precip'
+        add_to_paramdict(m.inputParams,parname,val)
+        rech_precip = 10**val/(nrow*ncol)
+
+        #rech_farm
+        low,high = [0.05,0.2] #percentage of the well extraction
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        parname='rech_farm'
+        add_to_paramdict(m.inputParams,parname,val)
+        rech_farm = [val*flux/np.prod(farm_size) for flux in wel_flux]
+
+        #Assign recharge data
+        rech_farm_mat = np.zeros((nrow,ncol),dtype=np.float32)
+        for i in range(nfarms):
+            rech_farm_mat[farm_loc_list[i]] = rech_farm[i]
+
+        rech_data = {}
+        for i in range(len(perlen)):
+            if i in kper_even:
+                rech_data[i] = rech_precip
+            elif i in kper_odd:
+                rech_data[i] = rech_farm_mat
+
         ##riv_stg
-        parname = 'riv_stg'
-        lowhigh = (.5,1.5)
-        stage = sample_dist(sts.uniform,1,0,m,'riv_stg',0,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
-        add_to_paramdict(m.inputParams,parname,stage)
+        low,high = (.5,1.5)
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        parname='riv_stg'
+        add_to_paramdict(m.inputParams,parname,val)
+        riv_stg = val
 
         ##riv_cond
-        parname = 'riv_cond'
-        lowhigh = np.log10((.1,100))
-        cond = sample_dist(sts.uniform,1,0,m,'riv_cond',1,*(lowhigh[0],lowhigh[1]-lowhigh[0]))
-        add_to_paramdict(m.inputParams,parname,cond)
+        low,high = np.log10((.1,100))
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        parname='riv_cond'
+        add_to_paramdict(m.inputParams,parname,val)
+        riv_cond = val
 
         #Write river data--take SSM data from WEL!!
         riv_grad = .0005
@@ -1216,7 +1230,7 @@ def run_MC(tot_it):
                                       ss=ss,sy=sy)
 
         # Add PCG Package to the MODFLOW model
-        pcg = flopy.modflow.ModflowPcg(m, hclose=1.e-8)
+        pcg = flopy.modflow.ModflowPcg(m, hclose=1.0e-8)
 
         # Add OC package to the MODFLOW model
         oc = flopy.modflow.ModflowOc(m,
@@ -1238,6 +1252,13 @@ def run_MC(tot_it):
                                      densemin=0., densemax=0., denseslp=denseslp, denseref=densefresh)
 
         #Write input
+        '''DEBUG SIMPLIFYING
+        m.remove_package('RIV')
+        m.remove_package('RCH')
+        m.remove_package('WEL')
+        ssm_data = load_obj(m.MC_file.parent,'ssm_data_base')
+        wel_data = load_obj(m.MC_file.parent,'wel_data_base')
+        DEBUG SIMPLIFYING'''
         m.write_input()
 
         # Try to delete the output files, to prevent accidental use of older files
@@ -1251,7 +1272,7 @@ def run_MC(tot_it):
             try:
                 os.remove(f)
             except:
-                pass
+                print('did not find file to remove: {}'.format(f))
 
         #Make timestamp
         import datetime
@@ -1260,9 +1281,11 @@ def run_MC(tot_it):
         ts_hms = ts.split(sep)[2:]
         ts_hms = sep.join(ts_hms)
 
+        if plotyn:
+            m.plot_hk_ibound(rowslice=rowslice,gridon=gridon)
         #Run model
         print('Running iteration {} of {}...'.format(it,tot_it))
-        v = m.run_model(silent=True, report=True)
+        v = m.run_model(silent=False, report=True)
         for idx in range(-3, 0):
             print(v[1][idx])
 
@@ -1270,20 +1293,19 @@ def run_MC(tot_it):
         _ = record_salinity(m,ts_hms=ts_hms);
         copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
         #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
-
         print('Finished iteration {} of {}'.format(it,tot_it))
     #Save inputParams immediately to prevent accidental destruction of them
     savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),m.inputParams)
     np.save(m.MC_file.parent.joinpath('inputParams.npy'),m.inputParams)
     save_obj(m.MC_file.parent,m.inputParams,'inputParams')
     save_obj(m.MC_file.parent,m.dis.get_node_coordinates(),'yxz')
-    return m.inputParams
+    return m.inputParams,ssm_data
 
 
 # In[24]:
-
+tot_it = 1
 ####Run the MC experiment ####
-inputParams = run_MC(tot_it)
+inputParams,ssm_data = run_MC(tot_it,plotyn=True)
 
 
 
