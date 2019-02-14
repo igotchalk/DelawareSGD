@@ -934,7 +934,7 @@ mas = plot_mas(m)
 rowslice = 1
 for p in per:
     conc,hds = extract_hds_conc(p)
-    basic_plot(p,hds,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
+    basic_plot(p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
 m.plot_hk_ibound(rowslice=rowslice,gridon=0)
 # In[21]:
 
@@ -1060,7 +1060,7 @@ wel_rng_m3pday = np.r_[wel_rng_mpday]*np.prod(farm_size)
 
 from scipy.io import savemat,loadmat
 
-def run_MC(tot_it,plotyn=False):
+def run_MC(tot_it,plotyn=False,silent=True):
     #### MAKE NEW/ADD TO OLD EXPT ####
     check_MC_inputParams()
 
@@ -1225,7 +1225,7 @@ def run_MC(tot_it,plotyn=False):
         wel_data,ssm_data,_ = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
 
         ##rech_precip
-        low,high = np.log10([1e-6,1e-1])
+        low,high = np.log10([1e-4,5e-1])
         val = sample_dist(sts.uniform,1,*(low,high-low))
         parname='rech_precip'
         add_to_paramdict(m.inputParams,parname,val)
@@ -1338,7 +1338,7 @@ def run_MC(tot_it,plotyn=False):
             m.plot_hk_ibound(rowslice=rowslice,gridon=gridon)
         #Run model
         print('Running iteration {} of {}...'.format(it,tot_it))
-        v = m.run_model(silent=True, report=True)
+        v = m.run_model(silent=silent, report=True)
         for idx in range(-3, 0):
             print(v[1][idx])
 
@@ -1360,9 +1360,9 @@ def run_MC(tot_it,plotyn=False):
 
 
 # In[24]:
-tot_it = 200
+tot_it = 1
 ####Run the MC experiment ####
-inputParams,ssm_data = run_MC(tot_it,plotyn=False)
+inputParams,ssm_data = run_MC(tot_it,plotyn=False,silent=False)
 
 
 
