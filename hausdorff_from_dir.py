@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jan 15 14:22:09 2019
+
+@author: ianpg
+"""
+
 #%%
 
 def load_obj(dirname,name):
@@ -174,6 +181,7 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1,pct=(.05,.9
     if saveyn==1:
         np.save(dirname.joinpath('hausdorff.npy'),hdorf_list)
         savemat(dirname.joinpath('hausdorff.mat').as_posix(),hdorf_matdict)
+        print('...saved!')
         return
     else:
         return hdorf_matdict,conc_mat
