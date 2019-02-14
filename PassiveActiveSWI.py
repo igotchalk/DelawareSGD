@@ -1036,6 +1036,12 @@ def idx2centroid(node_coord_tuple,idx_tuple):
     y_pt = node_coord_tuple[0][idx_tuple[1]]
     return (z_pt,y_pt,x_pt)
 
+def rem_last_ind_from_dict(dict):
+    dict_filt = {}
+    for k,v in dict.items():
+        vnew = v[:-1]
+        dict_filt[k] = vnew
+    return dict_filt
 
 # ### Run the MC experiment:
 
@@ -1332,15 +1338,19 @@ def run_MC(tot_it,plotyn=False):
             m.plot_hk_ibound(rowslice=rowslice,gridon=gridon)
         #Run model
         print('Running iteration {} of {}...'.format(it,tot_it))
-        v = m.run_model(silent=False, report=True)
+        v = m.run_model(silent=True, report=True)
         for idx in range(-3, 0):
             print(v[1][idx])
 
-        #Record final salinity as .npy, also move full CBC and UCN files to expt folder
-        _ = record_salinity(m,ts_hms=ts_hms);
-        copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
-        #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
-        print('Finished iteration {} of {}'.format(it,tot_it))
+        if v[0]:
+            #Record final salinity as .npy, also move full CBC and UCN files to expt folder
+            _ = record_salinity(m,ts_hms=ts_hms);
+            copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
+            #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
+            print('Finished iteration {} of {} successfully...\n\n\n\n'.format(it,tot_it))
+        else:
+            print('Unsuccessful iteration {} of {}, deleting inputParams from this it...\n\n\n\n'.format(it,tot_it))
+            m.inputParams = rem_last_ind_from_dict(m.inputParams)
     #Save inputParams immediately to prevent accidental destruction of them
     savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),m.inputParams)
     np.save(m.MC_file.parent.joinpath('inputParams.npy'),m.inputParams)
@@ -1350,9 +1360,9 @@ def run_MC(tot_it,plotyn=False):
 
 
 # In[24]:
-tot_it = 1
+tot_it = 200
 ####Run the MC experiment ####
-inputParams,ssm_data = run_MC(tot_it,plotyn=True)
+inputParams,ssm_data = run_MC(tot_it,plotyn=False)
 
 
 

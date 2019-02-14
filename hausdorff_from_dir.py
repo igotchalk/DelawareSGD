@@ -23,7 +23,7 @@ def idx2centroid(node_coord_tuple,idx_tuple):
     return (z_pt,y_pt,x_pt)
 
 
-def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=None):
+def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=None,contoursyn=True):
     import numpy.ma as ma
     import numpy as np
     import matplotlib.pyplot as plt
@@ -32,22 +32,24 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=N
     Cfresh = 0
     #pctage = np.array([.05,.5,.95])
     pctage = np.array([.5])
-    salthresh = Cfresh + (Csalt-Cfresh)*pctage #salinity corresponding to the spec. percentage
-    #tol = [.3,.2,.03]
-    tol = [.2]
+    lvls = Cfresh + (Csalt-Cfresh)*np.array([.05,.5,.95])
     for i in range(startind+numplots-1,startind-1,-1):
         if i>conc_mat.shape[0]:
             break
         for k in range(len(pctage)):
             f, axs = plt.subplots()
-            mskd = ma.masked_where((conc_mat[i]<salthresh[k]*(1+tol[k])) &
-                                   (conc_mat[i]>salthresh[k]*(1-tol[k])) |
-                                   (conc_mat[i]>1e10),conc_mat[i])
-            cpatch = plt.imshow(mskd[:,rowslice,:])
+            mskd = ma.masked_where((conc_mat[i]>1e10),conc_mat[i])
+            arr_plot = mskd[:,rowslice,:]
+            cpatch = plt.imshow(arr_plot,cmap='jet')
             plt.title('iter. {}, slice {} \nMasked points shown in white'.format(i,rowslice))
-            #cbar_ax = f.add_axes([0.90, 0.1, 0.02, 0.7])
-            #cb = f.colorbar(cpatch,cax=cbar_ax)
-            cb = plt.colorbar(ax=axs)
+            plt.xlabel('Col. number')
+            plt.ylabel('Lay. number')
+            if contoursyn:
+                CS = plt.contour(arr_plot,levels=lvls,colors='white')
+                plt.clabel(CS, CS.levels, inline=True, fontsize=10)
+            cbar_ax = f.add_axes([0.95, 0.3, 0.02, 0.4])
+            cb = f.colorbar(cpatch,cax=cbar_ax)
+            #cb = plt.colorbar(cpatch)
             cb.set_label('Salt concentration (g/L)')
             plt.show()
             if saveyn==1:
