@@ -464,7 +464,9 @@ sconc[:,:,0] = Cfresh
 icbund = np.ones((nlay, nrow, ncol), dtype=np.int)
 icbund[np.where(ibound==-1)] = -1
 
-def make_bc_dicts():
+head_inland_sum_wint = (0,0.3) #m in summer, m in winter
+
+def make_bc_dicts(head_inland_sum_wint=(0,0.3)):
     #Ocean and inland boundary types
     itype = flopy.mt3d.Mt3dSsm.itype_dict()
     chd_data = {}
@@ -534,6 +536,13 @@ def make_bc_dicts():
             pass
         #Inland boundary
         if bc_inland=='GHB':
+            if i in kper_odd:
+                head_inland = head_inland_sum_wint[0]
+            elif i in kper_even:
+                head_inland = head_inland_sum_wint[1]
+            left_edge = get_ocean_right_edge(m,ocean_line_tuple,
+                  int(np.where(henry_botm==find_nearest(henry_botm,head_inland))[0]),
+                col=0)
             for j in range(np.size(left_edge[0])):
                 dat_ghb.append([left_edge[0][j],
                                left_edge[1][j],
@@ -562,7 +571,7 @@ def make_bc_dicts():
     #timprs = [k for k in range(1,np.sum(perlen),50)]
     return chd_data, ssm_data, ghb_data, wel_data
 
-chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts()
+chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts(head_inland_sum_wint)
 wel_data_base,ssm_data_base = wel_data,ssm_data
 timprs = np.round(np.linspace(1,np.sum(perlen),20),decimals=0)
 
@@ -925,7 +934,7 @@ mas = plot_mas(m)
 rowslice = 1
 for p in per:
     conc,hds = extract_hds_conc(p)
-    basic_plot(p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
+    basic_plot(p,hds,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
 m.plot_hk_ibound(rowslice=rowslice,gridon=0)
 # In[21]:
 
@@ -1031,6 +1040,17 @@ def idx2centroid(node_coord_tuple,idx_tuple):
 # ### Run the MC experiment:
 
 # In[23]:
+#Load certain variables:
+rech_farm = load_obj(values_dir,'rech_rng_farm')
+rech_precip_sum,rech_precip_wint = load_obj(values_dir,'rech_rng_precip')
+'''
+values_dir = repo.joinpath('data/values_for_distributions')
+ghb_inland_sum,ghb_inland_wint = load_obj(values_dir,'ghb_rng_model_edge')
+wel_rng_mpday = load_obj(values_dir,'wel_rng_mday')
+
+wel_rng_m3pday = np.r_[wel_rng_mpday]*np.prod(farm_size)
+
+'''
 
 from scipy.io import savemat,loadmat
 
@@ -1043,6 +1063,29 @@ def run_MC(tot_it,plotyn=False):
     while it < tot_it:
         ssm_data = {}
         it += 1
+
+
+        #head_inland_sum
+        dist_inland = 10000 #m
+        low,high = np.r_[ghb_inland_sum]/dist_inland*Lx #ghb values taken from NMGWM, apply same gradient to this model
+        low,high = np.r_[-3,0] #ghb values taken from NMGWM, apply same gradient to this model
+        parname='head_inland_sum'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        head_inland_sum = val
+
+        #head_inland_wint
+        low,high = np.r_[ghb_inland_wint]/dist_inland*Lx #ghb values taken from NMGWM, apply same gradient to this model
+        low,high = np.r_[0,3] #ghb values taken from NMGWM, apply same gradient to this model
+        parname='head_inland_wint'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        head_inland_wint = val
+
+        #set ghb data and create dicts
+        chd_data, ssm_data_base, ghb_data, wel_data_base = make_bc_dicts((head_inland_sum,head_inland_wint))
+        save_obj(m.MC_file.parent,wel_data_base,'wel_data_base')
+        save_obj(m.MC_file.parent,ssm_data_base,'ssm_data_base')
 
 
         ''' HOMOGENOUS ONLY
@@ -1158,7 +1201,11 @@ def run_MC(tot_it,plotyn=False):
         dmcoef = 10**val
 
         ##wel
-        low,high = np.log10((1e1,1e3))
+        pressure_size = 25*8*2.59e+6 #area of pressure subarea mi*mi*(m2/mi)
+        pump_rate_m3perm2 = 118000*1233.48/(pressure_size) #(af/y)*(af/m3)/(m2)
+
+        low,high = np.log10((1e2,1e5))
+        low,high = np.log10((1e2,1e3))
         parname='wel'
         val = sample_dist(sts.uniform,n_wells,*(low,high-low))
         wel_flux = val
