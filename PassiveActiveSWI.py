@@ -209,7 +209,7 @@ def write_sample(fname,varname,distclass,sample):
     fout.close()
     return
 
-def truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=False):
+def truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=False,saveyn=False):
     grid_cutoffs = []
     for q in np.cumsum(lith_props):
         grid_cutoffs.append(np.quantile(grid,q))
@@ -228,13 +228,15 @@ def truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=False):
         f,axs = plt.subplots(2,1,sharex=True)
         axs[0].imshow(grid[:,0,:])
         axs[1].imshow(outgrid[:,0,:])
+        if saveyn:
+            plt.savefig(m.MC_file.parent.joinpath('Truncated_GRF.png').as_posix(),resolution=300)
     if log10trans:
         return np.power(10,outgrid)
     else:
         return outgrid
 #%%
 #Name model
-modelname = 'passive_active'
+modelname = 'mps'
 tot_it = 2
 # run installed version of flopy or add local path
 try:
@@ -243,8 +245,6 @@ except:
     fpth = os.path.abspath(os.path.join('..', '..'))
     sys.path.append(fpth)
     import flopy
-
-
 
 if sys.platform == "darwin":
     repo = Path('/Users/ianpg/Documents/ProjectsLocal/DelawareSGD')
@@ -277,6 +277,7 @@ Lz = 80.
 nlay = int(Lz/3)
 nrow = int(Ly/30)
 ncol = int(Lx/30)
+dim = tuple([int(x) for x in (nlay,nrow,ncol)])
 
 henry_top = 5
 ocean_elev = 0
@@ -300,7 +301,8 @@ offshore_elev = -beachslope*(ocean_col[1]-ocean_col[0])*delr
 
 
 #Period data
-Lt = 360*20 #Length of time in days
+nyrs= 40
+Lt = 360*nyrs #Length of time in days
 perlen = list(np.repeat(180,int(Lt/180)))
 nstp = list(np.ones(np.shape(perlen),dtype=int))
 
@@ -340,32 +342,55 @@ dis = flopy.modflow.ModflowDis(m, nlay, nrow, ncol, nper=nper, delr=delr,
 hkSand = 10.  #horizontal hydraulic conductivity m/day
 hkClay = hkSand*.01
 
-heterogenous = True
-mu = np.log(hkSand)
-sill = .1
-modeltype = 'Exponential'
-llay = int(20/np.mean(delv))
-lrow = int(2000/delc)
-lcol = int(2000/delr)
+heterogenous = 1 #0:homogenous,1:variogram,2:MPS
 
-
-if heterogenous:
+if heterogenous==1:
     import simulationFFT
+    mu = np.log(hkSand)
+    sill = .1
+    modeltype = 'Exponential'
+    llay = int(20/np.mean(delv))
+    lrow = int(2000/delc)
+    lcol = int(2000/delr)
+
     fft_grid = np.exp(simulationFFT.simulFFT(nrow, nlay, ncol, mu, sill, modeltype, lrow , llay, lcol))
+    grid = np.log10(fft_grid)
+    #lith_props = [0.2,0.5,0.3]
+    #hk_vals = [-1,0,2]
+    lith_props = [0.2,0.8]
+    hk_vals = [0,2]
+    
+    log10trans = True
+    plotyn= True
+    hk = truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=plotyn,saveyn=True)
     #hk[0:int(np.where(henry_botm==find_nearest(henry_botm,ocean_elev))[0])+1,:,:] = hkSand
+elif heterogenous==2:
+    import sgs_mod
+    nodes = 20
+    marg = .5
+    search_ellipse=(2000,500,20,0,0,0) #(max,med,min,az,dip,rake)
+    grid_size = (Lz,Ly,Lx)
+    grid_cells = dim
+    rotind= [1,2,0] #simulation in a Y,X,Z grid
+    constrain=1
+    expgridfile,outgrid,rotind,grid_cells_sgems = sgs_mod.snesim_grid(m.name, Path(model_ws),
+                                              grid_size,grid_cells,search_ellipse=search_ellipse,
+                                              TIfile=None,TIname=None,marg=marg,seed=1,nodes=nodes,
+                                              nreals=1,output=False,rmfiles=False,rotind=rotind,constrain=constrain)
+    outgrid = sgs_mod.read_sgems_grid(expgridfile,grid_cells,grid_cells_sgems)
+    outgrid = outgrid.squeeze()
+    hk = np.zeros(dim,dtype=np.float)
+    hk[np.where(outgrid==0)]=hkClay
+    hk[np.where(outgrid==1)]=hkSand
+    f,axs = plt.subplots(2,1,sharex=True)
+    plt.sca(axs[0])
+    plt.imshow(hk[-3,:,:])
+    axs[0].set_title('top view')
+    plt.sca(axs[1])
+    plt.imshow(hk[:,0,:])
+    axs[1].set_title('side view')
 else:
     hk = hkSand*np.ones((nlay,nrow,ncol), dtype=np.int32)
-
-grid = np.log10(fft_grid)
-#lith_props = [0.2,0.5,0.3]
-#hk_vals = [-1,0,2]
-lith_props = [0.2,0.8]
-hk_vals = [0,2]
-
-log10trans = True
-plotyn= True
-hk = truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=plotyn)
-
 
 #plt.figure(),plt.imshow((hk[:,0,:])),plt.colorbar(),plt.title('Sill:{}'.format(sill)),plt.show()
 
@@ -386,6 +411,11 @@ denseslp = (densesalt - densefresh) / (Csalt - Cfresh)
 #denseslp = 0 #trick for testing constant density
 
 # In[8]:
+#Winter is even stress periods, summer is odd SP.
+#Winter= wells OFF, natural precip (rech) ON, irrigation rech OFF,
+#Summer = wells ON, irrigation rech (farm_rech) ON,  precip (rech) OFF
+kper_odd = list(np.arange(1,nper,2))
+kper_even = list(np.arange(0,nper,2))
 
 #BCs
 bc_ocean = 'GHB'
@@ -464,7 +494,9 @@ sconc[:,:,0] = Cfresh
 icbund = np.ones((nlay, nrow, ncol), dtype=np.int)
 icbund[np.where(ibound==-1)] = -1
 
-def make_bc_dicts():
+head_inland_sum_wint = (0,0.3) #m in summer, m in winter
+
+def make_bc_dicts(head_inland_sum_wint=(0,0.3)):
     #Ocean and inland boundary types
     itype = flopy.mt3d.Mt3dSsm.itype_dict()
     chd_data = {}
@@ -534,6 +566,13 @@ def make_bc_dicts():
             pass
         #Inland boundary
         if bc_inland=='GHB':
+            if i in kper_odd:
+                head_inland = head_inland_sum_wint[0]
+            elif i in kper_even:
+                head_inland = head_inland_sum_wint[1]
+            left_edge = get_ocean_right_edge(m,ocean_line_tuple,
+                  int(np.where(henry_botm==find_nearest(henry_botm,head_inland))[0]),
+                col=0)
             for j in range(np.size(left_edge[0])):
                 dat_ghb.append([left_edge[0][j],
                                left_edge[1][j],
@@ -562,7 +601,7 @@ def make_bc_dicts():
     #timprs = [k for k in range(1,np.sum(perlen),50)]
     return chd_data, ssm_data, ghb_data, wel_data
 
-chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts()
+chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts(head_inland_sum_wint)
 wel_data_base,ssm_data_base = wel_data,ssm_data
 timprs = np.round(np.linspace(1,np.sum(perlen),20),decimals=0)
 
@@ -576,8 +615,6 @@ save_obj(m.MC_file.parent,ssm_data_base,'ssm_data_base')
 #Winter is even stress periods, summer is odd SP.
 #Winter= wells OFF, natural precip (rech) ON, irrigation rech OFF,
 #Summer = wells ON, irrigation rech (farm_rech) ON,  precip (rech) OFF
-kper_odd = list(np.arange(1,nper,2))
-kper_even = list(np.arange(0,nper,2))
 
 ##Add recharge data
 rech = 1e-6
@@ -920,12 +957,13 @@ def basic_plot(per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
 
 
 # In[19]:
-per = [-1,-2]
+per = [0,-1,-2]
 mas = plot_mas(m)
 rowslice = 1
+ts=''
 for p in per:
     conc,hds = extract_hds_conc(p)
-    basic_plot(p,hds,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
+    basic_plot(p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=0,contoursyn=1)
 m.plot_hk_ibound(rowslice=rowslice,gridon=0)
 # In[21]:
 
@@ -1034,107 +1072,177 @@ def rem_last_ind_from_dict(dict):
         dict_filt[k] = vnew
     return dict_filt
 
-# ### Run the MC experiment:
+
+def filt_inds_from_dict(dict,inds):
+    i=0
+    dict_false = {}
+    dict_true = {}
+    for k,v in dict.items():
+        vtrue = [x for i, x in enumerate(v) if i in inds]
+        vfalse = [x for i, x in enumerate(v) if i not in inds]
+        dict_true[k] = vtrue
+        dict_false[k] = vfalse
+        i+=1
+    return dict_true,dict_false
+
+
+
+
 
 # In[23]:
+#Load certain variables:
+values_dir = repo.joinpath('data/values_for_distributions')
+rech_farm = load_obj(values_dir,'rech_rng_farm')
+rech_precip_sum,rech_precip_wint = load_obj(values_dir,'rech_rng_precip')
+ghb_inland_sum,ghb_inland_wint = load_obj(values_dir,'ghb_rng_model_edge')
+wel_rng_mpday = load_obj(values_dir,'wel_rng_mday')
+wel_rng_m3pday = np.r_[wel_rng_mpday]*np.prod(farm_size)
 
 from scipy.io import savemat,loadmat
+import datetime
 
-def run_MC(tot_it,plotyn=False):
+def run_MC(tot_it,plotyn=False,silent=True):
     #### MAKE NEW/ADD TO OLD EXPT ####
     check_MC_inputParams()
-
+    runlog = []
     #### VARY PARAMS ####
     it = 0
     while it < tot_it:
         ssm_data = {}
         it += 1
 
+        #Make timestamp
+        sep = ''
+        ts = datetime.datetime.now().strftime('%m'+sep+'%d'+sep+'%H'+sep+'%M'+sep+'%S')
 
-        ''' HOMOGENOUS ONLY
-        #hk
-        low,high= (-3,0)
-        parname='hk'
+        #head_inland_sum
+        dist_inland = 10000 #m
+        low,high = np.r_[ghb_inland_sum]/dist_inland*Lx #ghb values taken from NMGWM, apply same gradient to this model
+        low,high = np.r_[-1.1,0] #adjusted from ghb values because model didnt converge for larger values
+        parname='head_inland_sum'
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
-        hk = 10**val
-        '''
+        head_inland_sum = val
 
-        #########HETEROGENOUS ONLY ##############
-        #hk1
-        low= -2
-        high = 0
-        parname='hk1'
+        #head_inland_wint
+        low,high = np.r_[ghb_inland_wint]/dist_inland*Lx #ghb values taken from NMGWM, apply same gradient to this model
+        low,high = np.r_[0,3] #ghb values taken from NMGWM, apply same gradient to this model
+        parname='head_inland_wint'
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
-        hk1 = 10**val
+        head_inland_wint = val
 
-        #hk2
-        low= 0
-        high = 2
-        parname='hk2'
-        val = sample_dist(sts.uniform,1,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,val)
-        hk2 = 10**val
+        #set ghb data and create dicts
+        chd_data, ssm_data_base, ghb_data, wel_data_base = make_bc_dicts((head_inland_sum,head_inland_wint))
+        save_obj(m.MC_file.parent,wel_data_base,'wel_data_base')
+        save_obj(m.MC_file.parent,ssm_data_base,'ssm_data_base')
 
-        #lith_prop
-        low= 0
-        high = 0.3
-        parname='lith_prop'
-        val = sample_dist(sts.uniform,1,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,val)
-        lith_prop = val
+        if heterogenous==0:
+        #HOMOGENOUS ONLY
+            #hk
+            low,high= (-3,0)
+            parname='hk'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            hk = 10**val
+        elif heterogenous in [1,2]:
+            #########HETEROGENOUS ONLY ##############
+            #hk1
+            low= -2
+            high = 0
+            parname='hk1'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            hk1 = 10**val
+    
+            #hk2
+            low= 0
+            high = 2
+            parname='hk2'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            hk2 = 10**val
+            
+            #lith_prop
+            low= 0
+            high = 0.3
+            parname='lith_prop'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            lith_prop = round(val,2)
+            
+            if heterogenous==1:
+                #vario_type
+                parname='vario_type'
+                val = int(round(np.random.rand()))
+                add_to_paramdict(m.inputParams,parname,val)
+                if val==1:
+                    vario_type = 'Gaussian'
+                elif val==0:
+                    vario_type = 'Exponential'
+                else:
+                    pass
+        
+                #corr_len
+                low= 250
+                high = 1000
+                parname='corr_len'
+                val = sample_dist(sts.uniform,1,*(low,high-low))
+                add_to_paramdict(m.inputParams,parname,val)
+                corr_len = val
+        
+                #corr_len_zx
+                # equal to lz/lx
+                low= .01
+                high = .1
+                parname='corr_len_zx'
+                val = sample_dist(sts.uniform,1,*(low,high-low))
+                add_to_paramdict(m.inputParams,parname,val)
+                corr_len_zx = val
+        
+                #corr_len_yx
+                # equal to ly/lx
+                low= 0.1
+                high = 1
+                parname='corr_len_yx'
+                val = sample_dist(sts.uniform,1,*(low,high-low))
+                add_to_paramdict(m.inputParams,parname,val)
+                corr_len_yx = val
+        
+        
+                #Create hk grid
+                mu = np.log(hkSand)
+                sill = 1
+                lcol = int(corr_len/delr)
+                llay = int(corr_len*corr_len_zx/np.mean(delv))
+                lrow = int(corr_len*corr_len_yx/delc)
+                fft_grid = np.exp(simulationFFT.simulFFT(nrow, nlay, ncol, mu, sill, vario_type, lrow , llay, lcol))
+                grid = np.log10(fft_grid)
+                lith_props = [lith_prop,1-lith_prop]
+                hk_vals = [hk1,hk2]
+                hk = truncate_grf(grid,lith_props,hk_vals,log10trans=False,plotyn=plotyn)
+            elif heterogenous==2: #MPS
+                import sgs_mod
+                nodes = 25
+                search_ellipse=(2000,500,20,0,0,0) #(max,med,min,az,dip,rake)
+                grid_size = (Lz,Ly,Lx)
+                grid_cells = dim
+                rotind= [1,2,0] #simulation in a Y,X,Z grid
+                constrain=1
+                seed = np.random.randint(0,10000)
+                expgridfile,outgrid,rotind,grid_cells_sgems = sgs_mod.snesim_grid(m.name, Path(model_ws),
+                                                                                  grid_size,grid_cells,search_ellipse=search_ellipse,
+                                                                                  TIfile=None,TIname=None,marg=1-lith_prop,seed=1,nodes=nodes,
+                                                                                  nreals=1,output=False,rmfiles=False,rotind=rotind,constrain=constrain)
+                outgrid = sgs_mod.read_sgems_grid(expgridfile,grid_cells,grid_cells_sgems)
+                outgrid = outgrid.squeeze()
+                hk = np.zeros(dim,dtype=np.float)
+                hk[np.where(outgrid==0)]=hk1
+                hk[np.where(outgrid==1)]=hk2
 
-        #vario_type
-        parname='vario_type'
-        val = int(round(np.random.rand()))
-        add_to_paramdict(m.inputParams,parname,val)
-        if val==1:
-            vario_type = 'Gaussian'
-        elif val==0:
-            vario_type = 'Exponential'
-        else:
-            pass
-
-        #corr_len
-        low= 250
-        high = 1000
-        parname='corr_len'
-        val = sample_dist(sts.uniform,1,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,val)
-        corr_len = val
-
-        #corr_len_zx
-        # equal to lz/lx
-        low= .01
-        high = .1
-        parname='corr_len_zx'
-        val = sample_dist(sts.uniform,1,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,val)
-        corr_len_zx = val
-
-        #corr_len_yx
-        # equal to ly/lx
-        low= 0.1
-        high = 1
-        parname='corr_len_yx'
-        val = sample_dist(sts.uniform,1,*(low,high-low))
-        add_to_paramdict(m.inputParams,parname,val)
-        corr_len_yx = val
-
-
-        #Create hk grid
-        mu = np.log(hkSand)
-        sill = 1
-        lcol = int(corr_len/delr)
-        llay = int(corr_len*corr_len_zx/np.mean(delv))
-        lrow = int(corr_len*corr_len_yx/delc)
-        fft_grid = np.exp(simulationFFT.simulFFT(nrow, nlay, ncol, mu, sill, vario_type, lrow , llay, lcol))
-        grid = np.log10(fft_grid)
-        lith_props = [lith_prop,1-lith_prop]
-        hk_vals = [hk1,hk2]
-        hk = truncate_grf(grid,lith_props,hk_vals,log10trans=False,plotyn=plotyn)
         hk[wel_cells] = hk.max()
+        np.save(m.MC_file.parent.joinpath('hk'+ts+'.npy'),hk)
+
         ######## END OF HETEROGENOUS BLOCK ############
 
         ##vka: ratio of vk/hk
@@ -1149,7 +1257,7 @@ def run_MC(tot_it,plotyn=False):
         ##al: #longitudinal dispersivity (m)
         #      Uniform [0.1,20] #10 from Walther et al
         low= 0.1
-        high = 20
+        high = 10
         parname='al'
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
@@ -1164,7 +1272,11 @@ def run_MC(tot_it,plotyn=False):
         dmcoef = 10**val
 
         ##wel
-        low,high = np.log10((1e1,1e3))
+        pressure_size = 25*8*2.59e+6 #area of pressure subarea mi*mi*(m2/mi)
+        pump_rate_m3perm2 = 118000*1233.48/(pressure_size) #(af/y)*(af/m3)/(m2)
+
+        low,high = np.log10((1e2,1e5))
+        low,high = np.log10((1e2,1e3))
         parname='wel'
         val = sample_dist(sts.uniform,n_wells,*(low,high-low))
         wel_flux = val
@@ -1178,7 +1290,7 @@ def run_MC(tot_it,plotyn=False):
         wel_data,ssm_data,_ = add_pumping_wells(wel_data_base,ssm_data_base,n_wells,wel_flux,farm_orig,kper_odd)
 
         ##rech_precip
-        low,high = np.log10([1e-6,1e-1])
+        low,high = np.log10([1e-4,5e-1])
         val = sample_dist(sts.uniform,1,*(low,high-low))
         parname='rech_precip'
         add_to_paramdict(m.inputParams,parname,val)
@@ -1211,7 +1323,7 @@ def run_MC(tot_it,plotyn=False):
         riv_stg = val
 
         ##riv_cond
-        low,high = np.log10((.1,100))
+        low,high = np.log10((.001,10))
         val = sample_dist(sts.uniform,1,*(low,high-low))
         parname='riv_cond'
         add_to_paramdict(m.inputParams,parname,val)
@@ -1280,59 +1392,115 @@ def run_MC(tot_it,plotyn=False):
             except:
                 print('did not find file to remove: {}'.format(f))
 
-        #Make timestamp
-        import datetime
-        sep = '-'
-        ts = datetime.datetime.now().strftime('%m'+sep+'%d'+sep+'%H'+sep+'%M'+sep+'%S')
-        ts_hms = ts.split(sep)[2:]
-        ts_hms = sep.join(ts_hms)
 
         if plotyn:
             m.plot_hk_ibound(rowslice=rowslice,gridon=gridon)
         #Run model
         print('Running iteration {} of {}...'.format(it,tot_it))
-        v = m.run_model(silent=True, report=True)
+        v = m.run_model(silent=silent, report=True)
         for idx in range(-3, 0):
             print(v[1][idx])
-
+        runlog.append(v[0])
         if v[0]:
             #Record final salinity as .npy, also move full CBC and UCN files to expt folder
-            _ = record_salinity(m,ts_hms=ts_hms);
-            copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts_hms+'.UCN').as_posix())
+            _ = record_salinity(m,ts_hms=ts);
+            copy_rename(os.path.join(m.model_ws,'MT3D001.UCN'),m.MC_file.parent.joinpath('conc_'+ts+'.UCN').as_posix())
             #copy_rename(os.path.join(m.model_ws,m.name+'.cbc'),m.MC_file.parent.joinpath('cbc_'+ts_hms+'.cbc').as_posix())
             print('Finished iteration {} of {} successfully...\n\n\n\n'.format(it,tot_it))
         else:
             print('Unsuccessful iteration {} of {}, deleting inputParams from this it...\n\n\n\n'.format(it,tot_it))
-            m.inputParams = rem_last_ind_from_dict(m.inputParams)
+            #m.inputParams = rem_last_ind_from_dict(m.inputParams)
+    inputParams_success,inputParams_fail = filt_inds_from_dict(m.inputParams,np.arange(len(runlog))[runlog])
+    inputParams_all = m.inputParams
+    inputParams = {'inputParams_all':inputParams_all,
+                   'inputParams_success': inputParams_success,
+                   'inputParams_fail': inputParams_fail,
+                   'runlog':runlog}
     #Save inputParams immediately to prevent accidental destruction of them
-    savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),m.inputParams)
-    np.save(m.MC_file.parent.joinpath('inputParams.npy'),m.inputParams)
-    save_obj(m.MC_file.parent,m.inputParams,'inputParams')
+    savemat(m.MC_file.parent.joinpath('inputParams.mat').as_posix(),inputParams)
+    np.save(m.MC_file.parent.joinpath('inputParams_all.npy'),m.inputParams)
+    np.save(m.MC_file.parent.joinpath('runlog.npy'),runlog)
+    save_obj(m.MC_file.parent,m.inputParams,'inputParams_all')
+    save_obj(m.MC_file.parent,inputParams_success,'inputParams_success')
     save_obj(m.MC_file.parent,m.dis.get_node_coordinates(),'yxz')
-    return m.inputParams,ssm_data
+    return m.inputParams,ssm_data,runlog
 
 
 # In[24]:
-tot_it = 200
+tot_it = 250
 ####Run the MC experiment ####
-inputParams,ssm_data = run_MC(tot_it,plotyn=False)
+inputParams,ssm_data,runlog = run_MC(tot_it,plotyn=False,silent=True)
+
+
+#%%
+#Plot success and failed runs to see if there are any parameters causing the trouble
+printyn=1
+filt = np.arange(len(runlog))[runlog]
+i=0
+input_fail = {}
+input_success = {}
+for k,v in m.inputParams.items():
+    vsucc = [x for i, x in enumerate(v) if i in filt]
+    vfail = [x for i, x in enumerate(v) if i not in filt]
+    input_fail[k] = vfail
+    input_success[k] = vsucc
+    if i==0:
+        Nsucc = len(vsucc)
+        Nfail = len(vfail)
+    i+=1
+    
+
+succMat = np.zeros((Nsucc,len(input_success)))
+for i,key in enumerate(input_success):
+    succMat[:,i] = np.asarray(input_success[key])
+
+failMat = np.zeros((Nfail,len(input_fail)))
+for i,key in enumerate(input_fail):
+    failMat[:,i] = np.asarray(input_fail[key])
+
+f, axs = plt.subplots(nrows=5,ncols=4, figsize=(6, 8))
+it=0
+for i in range(5):
+    for j in range(4):
+        ttl = str(it) + str(list(input_success.keys())[it])
+        plt.sca(axs[i,j])
+        plt.title(ttl)
+        plt.hist(failMat[:,it],label='fail')
+        plt.hist(succMat[:,it],label='succes')
+        plt.tick_params(
+            axis='y',          # changes apply to the x-axis
+            which='both',      # both major and minor ticks are affected
+            bottom=False,      # ticks along the bottom edge are off
+            top=False,         # ticks along the top edge are off
+            left=False,
+            right=False,
+            labelleft=False)
+        it+=1
+        if it==1:
+            plt.legend()
+if printyn == 1:
+    plt.savefig(str(m.MC_file.parent.joinpath('failplot.png')),dpi=200)
+
 
 
 
 #%% Calculate hausdorff matrix and export
 import hausdorff_from_dir
 #importlib.reload(hausdorff_from_dir)
-fnames = hausdorff_from_dir.create_concmat_from_ucndir(m.MC_file.parent)
+pers = np.cumsum(perlen)
+totims = pers[0::10]
+#totims = (2340.0,4860.0,7200.0)
+fnames = hausdorff_from_dir.create_concmat_from_ucndir(m.MC_file.parent,totims=totims)
 yxz = load_obj(m.MC_file.parent,'yxz')
-export_ind = -1 #which of the saved fnames to use for conc_mat
-hausdorff_from_dir.compute_export_hausdorff(m.MC_file.parent,
-                                            conc_mat=np.load(m.MC_file.parent.joinpath(fnames[export_ind])),
-                                            yxz=yxz)
 
-#%% Load from Matlab
-medoids = loadmat(dirname.joinpath('medoids.mat').as_posix())['medoids'][0]
-mdict = {}
-for i in range(len(medoids)):
-    mdict['medoid_mat'+str(i)] = conc_mat[i]
-savemat(dirname.joinpath('medoid_mats.mat').as_posix(),mdict)
+for i in range(len(totims)):
+    hausdorff_from_dir.compute_export_hausdorff(m.MC_file.parent,
+                                                conc_mat=np.load(m.MC_file.parent.joinpath(fnames[i])),
+                                                yxz=yxz,suffix=str(totims[i]))
+
+
+
+
+
+
 

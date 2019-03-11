@@ -45,6 +45,7 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=N
             break
         for k in range(len(pctage)):
             f, axs = plt.subplots()
+            axs.set_position([0.1, 0.1, 0.7, 0.8])
             mskd = ma.masked_where((conc_mat[i]>1e10),conc_mat[i])
             arr_plot = mskd[:,rowslice,:]
             cpatch = plt.imshow(arr_plot,cmap='jet')
@@ -54,17 +55,16 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=N
             if contoursyn:
                 CS = plt.contour(arr_plot,levels=lvls,colors='white')
                 plt.clabel(CS, CS.levels, inline=True, fontsize=10)
-            cbar_ax = f.add_axes([0.95, 0.3, 0.02, 0.4])
+            cbar_ax = f.add_axes([0.85, 0.3, 0.02, 0.4])
             cb = f.colorbar(cpatch,cax=cbar_ax)
             #cb = plt.colorbar(cpatch)
             cb.set_label('Salt concentration (g/L)')
-            plt.show()
             if saveyn==1:
-                plt.savefig(Path(dirname).joinpath('conc_it{}_slice{}.png'.format(i,rowslice)),dpi=150)
+                plt.savefig(Path(dirname).joinpath('conc_it{}_slice{}.png'.format(i,rowslice)).as_posix(),dpi=300)
     return
 
 
-def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1,pct=(.05,.95)):
+def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,saveyn=1,pct=(.05,.95),suffix=''):
     import glob
     import os
     import flopy
@@ -138,7 +138,10 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1,pct=(.05,.9
 
     try:
         #Do the same with inputParams dictionary
-        m.inputParams = load_obj(dirname,'inputParams')
+        if inputParams is None:
+            m.inputParams = load_obj(dirname,'inputParams_success')
+        else:
+            m.inputParams  = inputParams
         i=0
         inputParams_filt = {}
         for k,v in m.inputParams.items():
@@ -179,14 +182,14 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,saveyn=1,pct=(.05,.9
     hdorf_matdict['culled_conc_mat'] = np.delete(conc_mat, filt, 0)
     #Save hausdorff matrix, Input Parameter Values
     if saveyn==1:
-        np.save(dirname.joinpath('hausdorff.npy'),hdorf_list)
-        savemat(dirname.joinpath('hausdorff.mat').as_posix(),hdorf_matdict)
+        np.save(dirname.joinpath('hausdorff'+str(suffix)+'.npy'),hdorf_list)
+        savemat(dirname.joinpath('hausdorff'+str(suffix)+'.mat').as_posix(),hdorf_matdict)
         print('...saved!')
         return
     else:
         return hdorf_matdict,conc_mat
 
-def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,7200.0),modsize=(26,20,100),saveyn=1):
+def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,7200.0),modsize=(26,20,100),saveyn=1,Lt=7200):
     import glob
     import os
     import flopy
@@ -206,7 +209,7 @@ def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,720
     for i,fname in enumerate(ucn_fnames):
         print('file {} of {}'.format(i,len(ucn_fnames)))
         ucnobj = flopy.utils.binaryfile.UcnFile(fname)
-        if ucnobj.get_times()[-1] != 360*20:
+        if ucnobj.get_times()[-1] < Lt:
             filt.append(i)
             print('Simulation does not appear to have completed in file:\n    ' + Path(fname).parts[-1] +
                       '\n...removing file from conc_mat')
@@ -246,12 +249,57 @@ def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,720
         return conc_mat
 
 
+def create_hkmat_from_dir(dirname,runlog=None,pattern='hk*[0-9]*.npy',modsize=None,saveyn=True):
+    import glob
+    import os
+    import numpy as np
+    from pathlib import Path
 
+    dirname=Path(dirname)
+    hk_fnames = sorted(glob.glob(dirname.joinpath(pattern).as_posix()),
+                         key=os.path.getctime)
+    if modsize is None:
+        modsize =  np.shape(np.load(hk_fnames[0]))
+    
+    if runlog is None:
+        try:
+            runlog = np.load(dirname.joinpath('runlog.npy'))
+        except FileNotFoundError as error:
+            print(error)
+    #Make sure runlog and the number of files correspond
+    if len(runlog)==len(hk_fnames):
+        print('Number of total model runs equal to nubmer of hk files in directory.\n',
+              'Using runlog to filter out bad model runs...')
 
+    elif np.sum(runlog)==len(hk_fnames):
+        runlog = np.ones(np.shape(runlog),dtype=bool)
+        print('Number of successful model runs equal to nubmer of hk files in directory.\n',
+              'Assuming that all listed models in dir are the successful ones...')
+    else:
+        raise Exception('Cant figure out which models to discard based on runlog and the models in directory...',
+                        'Number of models: {}\nTotal runs: {}\n Successful runs: {}'.format(len(hk_fnames),len(runlog),np.sum(runlog)))
+    
+    hk_mat = np.zeros((np.sum(runlog),modsize[0],modsize[1],modsize[2]),dtype=float)
 
+    filt = [i for i,val in enumerate(runlog) if not val]
+    it = 0
+    for i,nam in enumerate(hk_fnames):
+        if i in filt:
+            print('Filename filtered out: {}'.format(Path(nam).parts[-1]))
+            continue
+        else:
+            hk_mat[it,:,:,:] = np.load(nam)
+            it+=1
 
-
-
+    if saveyn:
+        from scipy.io import savemat
+        print('saving...')
+        np.save(dirname.joinpath('hk_mat.npy'),hk_mat)
+        savemat(dirname.joinpath('hk_mat.mat').as_posix(),{"hk_mat" : hk_mat})
+        print('...done!')
+        return hk_fnames
+    else:
+        return hk_mat
 
 
 

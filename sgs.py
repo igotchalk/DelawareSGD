@@ -40,10 +40,10 @@ def sgs_grid(name, grid_size, grid_cells, params, target=None):
         f.write('RunGeostatAlgorithm  sgsim::/GeostatParamUtils/XML::<parameters>  <algorithm name="sgsim" />     <Grid_Name value="myGrid" region=""  />     <Property_Name  value="' + fname + '" />     <Nb_Realizations  value="1" />     <Seed  value="'+str(seed)+'" />     <Kriging_Type  value="Simple Kriging (SK)"  />     <Trend  value="0 0 0 0 0 0 0 0 0 " />    <Local_Mean_Property  value=""  />     <Assign_Hard_Data  value="1"  />     <Hard_Data  grid="" region="" property=""  />     <Max_Conditioning_Data  value="'+str(search_ellipse[0])+'" />     <Search_Ellipsoid  value="'+search+'" />    <AdvancedSearch  use_advanced_search="0"></AdvancedSearch>    <Use_Target_Histogram  value="0"  />     <Variogram  nugget="0" structures_count="1"  >    <structure_1  contribution="' + str(variogram_model[0])+'"  type="'+str(variogram_model[1])+'"   >      <ranges max="'+str(variogram_model[2])+'"  medium="'+str(variogram_model[3])+'"  min="'+str(variogram_model[4])+'"   />      <angles x="'+str(variogram_model[5])+'"  y="'+str(variogram_model[6])+'"  z="'+str(variogram_model[7])+'"   />    </structure_1> </Variogram>  </parameters>'+'\n')
     f.write('SaveGeostatGrid  myGrid::'+output+'\\'+fname+'.csv::csv::0::'+fname+'__real0'+'\n')
     f.close()
-    call(['sgems', fname_commands], shell=True, env={"PATH":"C:\\SGeMS-x64-Beta\\", "GSTLAPPLIHOME":"C:\\SGeMS-x64-Beta\\"})
+    call(['sgems-x64', fname_commands], shell=False)#, env={"PATH":"C:\\SGeMS-x64-Beta\\", "GSTLAPPLIHOME":"C:\\SGeMS-x64-Beta\\"})
     sgs = pd.read_csv(fname + '.csv', header = 0, names=[name])
-    os.remove(fname_commands)
-    os.remove(fname + '.csv')
+    #os.remove(fname_commands)
+    #os.remove(fname + '.csv')
     return sgs
 
 
@@ -56,7 +56,7 @@ def main():
     parameters = [(12, 10, 10, 10, 0, 0, 0), (1, 'Gaussian', 5, 1, 1, 90, 0, 0), (100)]
 
     perm = sgs_grid('temp', grid_size, grid_cells, parameters, [15, 5])
-    print perm
+    print(perm)
     sys.exit(1)
 
 
