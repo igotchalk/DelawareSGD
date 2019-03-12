@@ -1,6 +1,8 @@
 
 # coding: utf-8
 %matplotlib inline
+%load_ext autoreload
+%autoreload 2
 import os
 from pathlib import Path
 import sys
@@ -10,7 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import warnings
 import scipy.stats as sts
-
+import hausdorff_from_dir
 #%% Useful functions
 
 def load_obj(dirname,name):
@@ -335,7 +337,7 @@ dis = flopy.modflow.ModflowDis(m, nlay, nrow, ncol, nper=nper, delr=delr,
                                botm=henry_botm, perlen=perlen, nstp=nstp,
                                steady=steady,itmuni=itmuni,lenuni=lenuni,
                                tsmult=tsmult)
-
+create_MC_file()
 # In[5]:
 
 #Hydraulic conductivity field
@@ -605,7 +607,6 @@ chd_data, ssm_data, ghb_data, wel_data = make_bc_dicts(head_inland_sum_wint)
 wel_data_base,ssm_data_base = wel_data,ssm_data
 timprs = np.round(np.linspace(1,np.sum(perlen),20),decimals=0)
 
-create_MC_file()
 save_obj(m.MC_file.parent,wel_data_base,'wel_data_base')
 save_obj(m.MC_file.parent,ssm_data_base,'ssm_data_base')
 

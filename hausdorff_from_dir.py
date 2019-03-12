@@ -301,14 +301,28 @@ def create_hkmat_from_dir(dirname,runlog=None,pattern='hk*[0-9]*.npy',modsize=No
     else:
         return hk_mat
 
-
-
-
-
-
-
-
-
-
-
-
+def compute_pca(mat,mask=True,form='flat',saveyn=True,fpath=None):
+    import os
+    from pathlib import Path
+    import numpy as np
+    from sklearn import decomposition
+    from scipy.spatial import distance_matrix
+    from scipy.spatial.distance import squareform
+    from scipy.io import savemat
+    if mask:
+        mat[np.where(mat >= 1.0e30)] = 0.
+    mat_flat = np.reshape(mat,(mat.shape[0],-1),order='C')
+    pc = decomposition.PCA(n_components=mat.shape[0])
+    pc.fit(mat_flat)
+    X_out = pc.transform(mat_flat)
+    if form == 'flat':
+        D  = squareform(distance_matrix(X_out, X_out))
+    else:
+        D = distance_matrix(X_out, X_out)
+    if saveyn:
+        if fpath is None:
+            fpath = Path(os.getcwd()).joinpath('PCA.mat')
+        savemat(fpath.as_posix(),{'PCA_mat':D})
+    else:
+        return D
+    

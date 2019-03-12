@@ -57,10 +57,26 @@ hk_flat = reshape(hk_mat,size(hk_mat,1),[])';
 %we used Gaussian radial basis function kernel
 %For Gaussian RBF, kernel_para is for setting up the sigma value in RBF function 
 % sigma= kernel_para * mean distance between models 
-kernel_para=5;
+kernel_para=7;
 [Y_eig,ndim,rank]=KPCASOM_rank(hk_flat,'gaussian',kernel_para);
+%% Try KPCA on the conc_mats
+
+LU = [.05,.95];
+% culled_conc_mat(culled_conc_mat >= 1e30) = 0;
+culled_conc_mat((culled_conc_mat < LU(1)*35) | (culled_conc_mat > LU(2)*35))=0;
+conc_flat = reshape(culled_conc_mat,size(culled_conc_mat,1),[])';
+[Y, eigVector,eigValue]=kpca_process(conc_flat','gaussian',7);
+%plot the percetange of variance
+ndim=ploteigvalue(eigValue,0.8);
+figure;
+scatter3(Y(:,1),Y(:,2),Y(:,3))
+
+
+hausdorff_mat = squareform(pdist(Y));
+
 
 %% 2. Load & process input data
+
 D = hausdorff_mat;
 N = length(D);
 ParametersNames = fieldnames(InputParams)';
@@ -91,7 +107,7 @@ DGSA.ParametersNames = ParametersNames;
 %% 4. Cluster and Compute Main Effects
 
 % 4.1 Inputs for clustering and display options.
-DGSA.Nbcluster=4; % # of clusters
+DGSA.Nbcluster=6; % # of clusters
 DGSA.MainEffects.Display.ParetoPlotbyCluster=1; % if true, main effects over cluster will be displayed with Pareto plot.
 DGSA.MainEffects.Display.StandardizedSensitivity='CI'; 
 
@@ -113,7 +129,7 @@ med_mats(med_mats>=1e30)=NaN;
 %%
 %Plot MDS results and representative plots
 plotreps=true;
-rowslice= 15;
+rowslice= 20;
 printplotsyn=true;
 
 data2pos = @(data,datalims,axlims) (data-datalims(1))/diff(datalims)*diff(axlims) + axlims(1);
@@ -153,7 +169,9 @@ if plotreps
     [~,sortind] = sort(pts.XData(medoids));
     for i=1:length(medoids)
         ax2 = axes('Position',pos(i,:),'Color','none');
-        imagesc(squeeze(med_mats(sortind(i),:,rowslice,:)));
+        data=  squeeze(med_mats(sortind(i),:,rowslice,:));
+        data((data < UL(1)*35) | (data > UL(2)*35))=NaN;
+        imagesc(data,'AlphaData',~isnan(data));
         ax2.XTickLabel='';
         ax2.YTickLabel='';
         x=[data2pos(pts.XData(medoids(sortind(i))),ax.XLim,[ax.Position(1),ax.Position(1)+ax.Position(3)]),...
@@ -229,9 +247,9 @@ end
 
 %% Sort and plot figures to see how they match up
 
-numplots=4;
+numplots=40;
 startind=1;
-every=10;
+every=15;
 rowslice= 10;
 [~,sortind] = sort(pts.XData);
 
@@ -283,7 +301,7 @@ DGSA.ConditionalEffects.Display.StandardizedSensitivity='Hplot'; % If omitted Pa
 [H,X] = DisplayConditionalEffects(DGSA,DGSA.ConditionalEffects.Display.StandardizedSensitivity)
 %%
 % 5.4 Display class condtional CDFs
-cdf_ConditionalEffects('vka','hk2',DGSA,5)
+cdf_ConditionalEffects('hk1','hk2',DGSA,5)
 
 %% Save all variables for futher application
 %save('VariablesSaved/DGSA_Completed.mat');
