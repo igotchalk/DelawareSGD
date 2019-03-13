@@ -386,6 +386,8 @@ denseslp = (densesalt - densefresh) / (Csalt - Cfresh)
 #denseslp = 0 #trick for testing constant density
 
 # In[8]:
+kper_odd = list(np.arange(1,nper,2))
+kper_even = list(np.arange(0,nper,2))
 
 #BCs
 bc_ocean = 'GHB'
