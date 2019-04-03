@@ -130,6 +130,7 @@ med_mats(med_mats>=1e30)=NaN;
 %Plot MDS results and representative plots
 plotreps=true;
 rowslice= 20;
+UL = [.05 .95]; %Pct seawater that classifies the transition zone
 printplotsyn=true;
 
 data2pos = @(data,datalims,axlims) (data-datalims(1))/diff(datalims)*diff(axlims) + axlims(1);

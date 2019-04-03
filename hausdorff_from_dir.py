@@ -236,11 +236,15 @@ def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,720
     ucn_names_filt = [fname for i,fname in enumerate(ucn_fnames) if i not in filt]
 
     if saveyn==1:
+        from scipy.io import savemat
         print('saving...')
         fnames = []
+        conc_mat_dict = {}
         for i,tim in enumerate(totims):
             fnames.append('conc_mat_totim' + str(int(tim)) + '.npy')
             np.save(dirname.joinpath(fnames[i]),conc_mat_filt[i,:,:,:,:])
+            conc_mat_dict[fnames[i][:-4]] = conc_mat_filt[i,:,:,:,:]
+        savemat(dirname.joinpath('conc_mat.mat').as_posix(),conc_mat_dict)
         save_obj(dirname,ucn_names_filt,'ucn_fnames')
         save_obj(dirname,filt,'filt')
         print('...done!')
