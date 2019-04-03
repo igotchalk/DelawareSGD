@@ -1,5 +1,3 @@
-
-# coding: utf-8
 %matplotlib inline
 %load_ext autoreload
 %autoreload 2
@@ -34,7 +32,6 @@ import flopy
 import SGD
 import config
 import hausdorff_from_dir
-
 if not os.path.exists(model_ws):
     os.makedirs(model_ws)
 
@@ -262,6 +259,10 @@ def truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=False,saveyn=Fal
     else:
         return outgrid
 
+#%%
+#Name model
+
+
 def pec_num(delv,delc,delr,al):
     delL = (delv,delc,delr) #length in the lay,row,col directions
     pec_num = [round(d/al,2) for d in delL]
@@ -275,25 +276,22 @@ print(sys.version)
 print('numpy version: {}'.format(np.__version__))
 print('flopy version: {}'.format(flopy.__version__))
 print('Model workspace:', os.path.abspath(model_ws))
-#%%
+
 #Model discretization
 Lx = 2000.
 Ly = 600.
 Lz = 80.
+
 nlay = int(Lz/3)
 nrow = int(Ly/30)
 ncol = int(Lx/30)
 
-Lx = 300.
-Ly = 100.
-Lz = 20.
-nlay = int(Lz/3)
-nrow = int(Ly/3)
-ncol = int(Lx/3)
-
-
-
-
+#Lx = 300.
+#Ly = 100.
+#Lz = 20.
+#nlay = int(Lz/3)
+#nrow = int(Ly/3)
+#ncol = int(Lx/3)
 
 dim = tuple([int(x) for x in (nlay,nrow,ncol)])
 
@@ -377,7 +375,7 @@ if heterogenous==1:
     #hk_vals = [-1,0,2]
     lith_props = [0.2,0.8]
     hk_vals = [0,2]
-    
+
     log10trans = True
     plotyn= True
     hk = truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=plotyn,saveyn=True)
@@ -912,8 +910,9 @@ def plot_mas(m):
     plt.show()
     return mas
 
-def extract_hds_conc(per):
-    fname = os.path.join(model_ws, '' + modelname + '.hds')
+def extract_hds_conc(m,per):
+    fname = Path(m.model_ws).joinpath(Path(m.name).parts[-1] + '.hds').as_posix()
+
     hdobj = flopy.utils.binaryfile.HeadFile(fname)
     times = hdobj.get_times()
     hds = hdobj.get_data(totim=times[per])
@@ -921,7 +920,7 @@ def extract_hds_conc(per):
     hds[np.where((hds>1e10) | (hds<-1e10))] = np.nan
 
     # Extract final timestep salinity
-    fname = os.path.join(model_ws, 'MT3D001.UCN')
+    fname = Path(m.model_ws).joinpath('MT3D001.UCN').as_posix()
     ucnobj = flopy.utils.binaryfile.UcnFile(fname)
     times = ucnobj.get_times()
     kstpkper = ucnobj.get_kstpkper()
@@ -932,7 +931,7 @@ def extract_hds_conc(per):
 
 # Make head and quiver plot
 import utils
-def basic_plot(per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
+def basic_plot(m,per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
     printyn = 1
 
     f, axs = plt.subplots(1, figsize=(6, 2))
@@ -946,7 +945,7 @@ def basic_plot(per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
     backgroundpatch,lbl = cpatchcollection,label = plot_background(mm,backgroundplot,'conc(g/L)')
     lvls = Cfresh + (Csalt-Cfresh)*np.array([.05,.5,.95])
     if contoursyn==1:
-        CS = mm.contour_array(conc,head=hds,levels=lvls,colors='white')
+        CS = mm.contour_array(backgroundplot,levels=lvls,colors='white')
         plt.clabel(CS, CS.levels, inline=True, fontsize=10)
 
     #mm.contour_array(hds,head=hds)
@@ -970,7 +969,7 @@ def basic_plot(per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
         plt.savefig(m.MC_file.parent.joinpath(ts + 'flowvec_row' + str(rowslice) +
                                  '_per' + str(per) + '_' + lbl[:3] + '.png').as_posix(),dpi=150)
     plt.show()
-    return
+    return CS
 
 
 # In[19]:
@@ -979,8 +978,8 @@ mas = plot_mas(m)
 rowslice = 1
 ts=''
 for p in per:
-    conc,hds = extract_hds_conc(p)
-    basic_plot(p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
+    conc,hds = extract_hds_conc(m,p)
+    basic_plot(m,p,conc,rowslice=rowslice,scale=70,iskip=3,printyn=1,contoursyn=1)
 m.plot_hk_ibound(rowslice=rowslice,gridon=0)
 # In[21]:
 
@@ -1171,7 +1170,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
             val = sample_dist(sts.uniform,1,*(low,high-low))
             add_to_paramdict(m.inputParams,parname,val)
             hk1 = 10**val
-    
+
             #hk2
             low= 0
             high = 2
@@ -1179,7 +1178,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
             val = sample_dist(sts.uniform,1,*(low,high-low))
             add_to_paramdict(m.inputParams,parname,val)
             hk2 = 10**val
-            
+
             #lith_prop
             low= 0
             high = 0.3
@@ -1187,7 +1186,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
             val = sample_dist(sts.uniform,1,*(low,high-low))
             add_to_paramdict(m.inputParams,parname,val)
             lith_prop = round(val,2)
-            
+
             if heterogenous==1:
                 #vario_type
                 parname='vario_type'
@@ -1199,7 +1198,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
                     vario_type = 'Exponential'
                 else:
                     pass
-        
+
                 #corr_len
                 low= 250
                 high = 1000
@@ -1207,7 +1206,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
                 val = sample_dist(sts.uniform,1,*(low,high-low))
                 add_to_paramdict(m.inputParams,parname,val)
                 corr_len = val
-        
+
                 #corr_len_zx
                 # equal to lz/lx
                 low= .01
@@ -1216,7 +1215,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
                 val = sample_dist(sts.uniform,1,*(low,high-low))
                 add_to_paramdict(m.inputParams,parname,val)
                 corr_len_zx = val
-        
+
                 #corr_len_yx
                 # equal to ly/lx
                 low= 0.1
@@ -1225,8 +1224,8 @@ def run_MC(tot_it,plotyn=False,silent=True):
                 val = sample_dist(sts.uniform,1,*(low,high-low))
                 add_to_paramdict(m.inputParams,parname,val)
                 corr_len_yx = val
-        
-        
+
+
                 #Create hk grid
                 mu = np.log(hkSand)
                 sill = 1
@@ -1465,7 +1464,7 @@ for k,v in m.inputParams.items():
         Nsucc = len(vsucc)
         Nfail = len(vfail)
     i+=1
-    
+
 
 succMat = np.zeros((Nsucc,len(input_success)))
 for i,key in enumerate(input_success):
