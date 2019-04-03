@@ -1,10 +1,9 @@
 %matplotlib inline
-# coding: utf-8
-#%load_ext autoreload
-#%autoreload 2
+%load_ext autoreload
+%autoreload 2
 
 
-
+#Name model
 modelname = 'homogenous_gridtest'
 tot_it = 2
 
@@ -29,7 +28,6 @@ elif sys.platform == "win32":
 
 if repo.as_posix() not in sys.path:
     sys.path.append(repo.as_posix())
-
 import flopy
 import SGD
 import config
@@ -264,6 +262,15 @@ def truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=False,saveyn=Fal
 #%%
 #Name model
 
+
+def pec_num(delv,delc,delr,al):
+    delL = (delv,delc,delr) #length in the lay,row,col directions
+    pec_num = [round(d/al,2) for d in delL]
+    for num,point  in zip(pec_num,('lay','row','col')):
+        print('Pe = {} in the {} direction'.format(num,point))
+    return pec_num
+#%%
+
 sw_exe = config.swexe #set the exe path for seawat
 print(sys.version)
 print('numpy version: {}'.format(np.__version__))
@@ -271,13 +278,21 @@ print('flopy version: {}'.format(flopy.__version__))
 print('Model workspace:', os.path.abspath(model_ws))
 
 #Model discretization
-Lx = 3000.
+Lx = 2000.
 Ly = 600.
 Lz = 80.
 
 nlay = int(Lz/3)
 nrow = int(Ly/30)
-ncol = int(Lx/(4*al))
+ncol = int(Lx/30)
+
+#Lx = 300.
+#Ly = 100.
+#Lz = 20.
+#nlay = int(Lz/3)
+#nrow = int(Ly/3)
+#ncol = int(Lx/3)
+
 dim = tuple([int(x) for x in (nlay,nrow,ncol)])
 
 henry_top = 5
@@ -340,7 +355,7 @@ create_MC_file()
 # In[5]:
 
 #Hydraulic conductivity field
-hkSand = 10.  #horizontal hydraulic conductivity m/day
+hkSand = 100.  #horizontal hydraulic conductivity m/day
 hkClay = hkSand*.01
 
 heterogenous = 0 #0:homogenous,1:variogram,2:MPS
@@ -951,8 +966,8 @@ def basic_plot(m,per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
     cb = f.colorbar(cpatchcollection,cax=cbar_ax)
     cb.set_label(label)
     if printyn == 1:
-        plt.savefig(os.path.join(m.model_ws, m.name + '_' + ts + '_flowvec_row' + str(rowslice) +
-                                 '_per' + str(per) + '_' + lbl[:3] + '.png'),dpi=150)
+        plt.savefig(m.MC_file.parent.joinpath(ts + 'flowvec_row' + str(rowslice) +
+                                 '_per' + str(per) + '_' + lbl[:3] + '.png').as_posix(),dpi=150)
     plt.show()
     return CS
 
