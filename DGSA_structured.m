@@ -18,83 +18,92 @@ end
 
 %load hausdorff matrix
 % exptdir = '/Users/ianpg/Dropbox/TempShared/MC_expt_2019-01-08-02-50';
-exptdir ='E:\Projects\DelawareSGD\work\homogenous\MC_expt_2018-12-21-23-17'; %homogenous
+% exptdir ='E:\Projects\DelawareSGD\work\homogenous\MC_expt_2018-12-21-23-17'; %homogenous
 %exptdir = 'E:\Projects\DelawareSGD\work\homogenous\MC_expt_2019-01-08-02-50'; %homogenous
+exptdir = 'E:\Projects\DelawareSGD\work\homogenous_500it\MC_expt_2019-04-04-19-30'; %homogenous500, presented to Peter,Jef
+exptdir = 'E:\Projects\DelawareSGD\work\heterogenous_500it\MC_expt_2019-04-04-21-09'; %heterogenous500 presented to peter, Jef
 %exptdir = 'E:\Projects\DelawareSGD\work\passive_active\MC_expt_2019-02-12-11-55';
 %exptdir ='E:/Projects/DelawareSGD/work/passive_active/MC_expt_2019-02-14-14-26'; %200 it, heterogenous, changed head_inland_sum
 %exptdir ='E:/Projects/DelawareSGD/work/passive_active/MC_expt_2019-02-18-17-52/'; %500it,heterogenous,riv_cond updated (was way too high) 
 %exptdir = 'E:\Projects\DelawareSGD\work\mps\MC_expt_2019-03-02-18-49\'; %500it, BC prior should be identical to MC_expt_2019-02-18-17-52
+
+
+
 addpath(exptdir);
 
-
+distmat = 'kpca';
 printplotsyn = true;
 totims = {'2340.0','4860.0','7200.0'};
 tim = totims(end);
-try
-    finput = char(strcat('hausdorff',char(tim),'.mat'));
-    load(fullfile(exptdir,finput));
-catch
-    finput = char('hausdorff.mat');
-    load(fullfile(exptdir,finput));
-end
-
-
-
-finput_hk = 'hk_mat.mat';
 
 try
-    load(fullfile(exptdir,'culled.mat'));
+   S =  load(fullfile(exptdir,'culled.mat'));
 catch
-    load(fullfile(exptdir,'conc_mat.mat'));
+   S = load(fullfile(exptdir,'conc_mat.mat'));
+end
+conc_mat_names = sort(fieldnames(S));
+culled_conc_mat=  S.(string(conc_mat_names(end)));
+totims={}
+for i=1:length(conc_mat_names)
+   strtemp = conc_mat_names{i};
+    totims{i} = strtemp(15:end);
 end
 
-sz = size(hausdorff_mat);
-if sz(1)~=sz(2)
-    hausdorff_mat = squareform(hausdorff_mat);
+
+if strcmp(distmat,'hausdorff') 
+    try
+        finput = char(strcat('hausdorff',char(tim),'.mat'));
+        load(fullfile(exptdir,finput));
+    catch
+        finput = char('hausdorff.mat');
+        load(fullfile(exptdir,finput));
+    end
+    sz = size(hausdorff_mat);
+    if sz(1)~=sz(2)
+        hausdorff_mat = squareform(hausdorff_mat);
+    end
+else
+    inputStruct = load(fullfile(exptdir,'InputParams_filt.mat'));
+    InputParams = inputStruct.InputParams;
+    ParametersNames = names2latex(fieldnames(InputParams)');
+    ParametersValues = inputStruct.ParametersValues;
+
+    %Do KPCA on the conc_mats
+    % LU = [.05,.95];
+     LU = [.05,.95];
+    conc_mat = culled_conc_mat;
+    culled_conc_mat((culled_conc_mat < LU(1)*35) | (culled_conc_mat > LU(2)*35))=0;
+    conc_flat = reshape(culled_conc_mat,size(culled_conc_mat,1),[])';
+    [Y, eigVector,eigValue]=kpca_process(conc_flat','gaussian',7);
+    %plot the percetange of variance
+    ndim=ploteigvalue(eigValue,0.8);
+    figure;
+    scatter3(Y(:,1),Y(:,2),Y(:,3))
+    hausdorff_mat = squareform(pdist(Y));    
 end
 
-culled_conc_mat=  conc_mat_totim7200;
 %% Load spatial matrices and calculate rank
 try
+    finput_hk = 'hk_mat.mat';
     load(fullfile(exptdir,finput_hk));
+    %run the KPCASOM_rank script
+    %we used Gaussian radial basis function kernel
+    %For Gaussian RBF, kernel_para is for setting up the sigma value in RBF function 
+    % sigma= kernel_para * mean distance between models 
+    hk_flat = reshape(hk_mat,size(hk_mat,1),[])';
+    kernel_para=7;
+    [Y_eig,ndim,rank]=KPCASOM_rank(hk_flat,'gaussian',kernel_para);
+    %Add spatial heterogeneity to list if relevant 
+    ParametersNames{end+1} = 'hk_spatial';
+    ParametersValues = horzcat(ParametersValues,rank');
 catch
     disp('No HK matrix. Assuming homogenous?')
     hk_mat = 10*ones(size(culled_conc_mat));
 end
-hk_flat = reshape(hk_mat,size(hk_mat,1),[])';
 
-%run the KPCASOM_rank script
-%we used Gaussian radial basis function kernel
-%For Gaussian RBF, kernel_para is for setting up the sigma value in RBF function 
-% sigma= kernel_para * mean distance between models 
-kernel_para=7;
-[Y_eig,ndim,rank]=KPCASOM_rank(hk_flat,'gaussian',kernel_para);
-%% Try KPCA on the conc_mats
-
-% LU = [.05,.95];
- LU = [-1,2];
-conc_mat = culled_conc_mat;
-culled_conc_mat((culled_conc_mat < LU(1)*35) | (culled_conc_mat > LU(2)*35))=0;
-conc_flat = reshape(culled_conc_mat,size(culled_conc_mat,1),[])';
-[Y, eigVector,eigValue]=kpca_process(conc_flat','gaussian',7);
-%plot the percetange of variance
-ndim=ploteigvalue(eigValue,0.8);
-figure;
-scatter3(Y(:,1),Y(:,2),Y(:,3))
-hausdorff_mat = squareform(pdist(Y));
-
-
-%% 2. Load & process input data
-
+%Assign some variables
 D = hausdorff_mat;
 N = length(D);
-ParametersNames = fieldnames(InputParams)';
-ParametersNames = names2latex(ParametersNames);
-%%
-%Add spatial heterogeneity to list
-ParametersNames{end+1} = 'hk_spatial';
-ParametersValues = horzcat(ParametersValues,rank');
-
 
 
 %%
@@ -140,7 +149,7 @@ med_mats(med_mats>=1e30)=NaN;
 %Plot MDS results and representative plots
 plotreps=true;
 rowslice= 20;
-UL = [0.00 1.00]; %Pct seawater that classifies the transition zone
+UL = [0.05 .95]; %Pct seawater that classifies the transition zone
 printplotsyn=true;
 
 data2pos = @(data,datalims,axlims) (data-datalims(1))/diff(datalims)*diff(axlims) + axlims(1);
@@ -188,15 +197,20 @@ if printplotsyn
     else
         namext='';
     end
-    namext = strcat(namext,num2str(DGSA.Nbcluster),'_t',string(tim));
+    namext = strcat(namext,num2str(DGSA.Nbcluster),'_t',string(tim),'.tif');
     print(fullfile(exptdir,strcat('clustering',namext)),'-dtiff','-r300')
 end
 
 %% Compute DGSA sensitivity with time
 % totims = {'2340.0','4860.0','7200.0'};
-tgrid = totims(2:end);
-hausdorff_mat_cat = concat_hausdorff_mats(exptdir,tgrid);
-
+% tgrid = totims;
+%hausdorff_mat_cat = concat_hausdorff_mats(exptdir,tgrid);
+hausdorff_mat_cat = zeros(length(conc_mat_names),size(hausdorff_mat,1),size(hausdorff_mat,2));
+tgrid = [];
+for i=1:length(conc_mat_names)
+    tgrid(i) = str2num(totims{i});
+    hausdorff_mat_cat(i,:,:) = kpca_concmat(S.(conc_mat_names{i}));
+end
 m=zeros(length(tgrid),size(ParametersNames,2));
 
 sens = DGSA_over_time(DGSA,hausdorff_mat_cat,tgrid);
@@ -275,7 +289,7 @@ if printplotsyn
 end
 %% 4.5 Display cdfs
 
-cdf_MainFactor(DGSA.ParametersValues, DGSA.Clustering, DGSA.ParametersNames,{'al','hk1','hk2','hk_spatial'}); %last arg can be cell of params e.g. {'al','vka'}
+cdf_MainFactor(DGSA.ParametersValues, DGSA.Clustering, DGSA.ParametersNames,{'al','hk2','dmcoef'}); %last arg can be cell of params e.g. {'al','vka'}
 if printplotsyn 
     %print(strcat(exptdir,'/cdfs'),'-dtiff','-r150')
 end
@@ -301,7 +315,7 @@ DGSA.ConditionalEffects.Display.StandardizedSensitivity='Hplot'; % If omitted Pa
 [H,X] = DisplayConditionalEffects(DGSA,DGSA.ConditionalEffects.Display.StandardizedSensitivity)
 %%
 % 5.4 Display class condtional CDFs
-cdf_ConditionalEffects('hk1','hk2',DGSA,5)
+cdf_ConditionalEffects('sy','wel3',DGSA,1)
 
 %% Save all variables for futher application
 %save('VariablesSaved/DGSA_Completed.mat');
@@ -310,6 +324,13 @@ cdf_ConditionalEffects('hk1','hk2',DGSA,5)
 
 
 %% Custom functions
+function D = kpca_concmat(conc_mat)
+    LU = [.05,.95];
+    conc_mat((conc_mat < LU(1)*35) | (conc_mat > LU(2)*35))=0;
+    conc_flat = reshape(conc_mat,size(conc_mat,1),[])';
+    [Y, eigVector,eigValue]=kpca_process(conc_flat','gaussian',7);
+    D = squareform(pdist(Y));    
+end
 
 %Change names with underscores to be read by latex as a subscript
 function out_cellarray = names2latex(name_cellarray)
@@ -321,7 +342,6 @@ function out_cellarray = names2latex(name_cellarray)
         else
             out_cellarray{i} = sp{1};
         end
-        
         %out_cellarray{i} = strcat('$$',out_cellarray{i},'$$');
     end
 end 

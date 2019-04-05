@@ -6,6 +6,12 @@ Created on Tue Jan 15 14:22:09 2019
 """
 
 #%%
+import glob
+import os
+import flopy
+import numpy as np
+from pathlib import Path
+from scipy.io import savemat
 
 def load_obj(dirname,name):
     import pickle
@@ -64,14 +70,55 @@ def show_concplots(conc_mat,startind=0,rowslice=0,numplots=10,saveyn=0,dirname=N
     return
 
 
-def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,saveyn=1,pct=(.05,.95),suffix=''):
-    import glob
-    import os
-    import flopy
-    import numpy as np
-    from pathlib import Path
-    from scipy.io import savemat
+def conc_mat_from_dir(dirname,m):
+    #make a point cloud for each conc array
+    conc_fnames = sorted(glob.glob(dirname.joinpath('conc*.npy').as_posix()),
+                         key=os.path.getctime)
+    
+    conc_mat = np.zeros((len(conc_fnames),m.nlay,m.nrow,m.ncol),dtype=float)
+    for i,fname in enumerate(conc_fnames):
+        conc_mat[i] = np.load(fname)
+    return conc_mat
 
+def filter_dict(indict,filt_inds):
+    i=0
+    dict_filt = {}
+    for k,v in indict.items():
+        if k in filt_inds:
+            print('iteration ',k,'doesnt meet reqs and will be filtered out')
+        else:
+            dict_filt[i] = v
+            i+=1
+    return dict_filt
+
+def filter_inputParams(inputParams_dict,filt_inds):
+    i=0
+    inputParams_filt = {}
+    for k,v in inputParams_dict.items():
+        vnew = [x for i, x in enumerate(v) if i not in filt_inds]
+        inputParams_filt[k] = vnew
+        if i==0:
+            N = len(vnew)
+        i+=1
+    return inputParams_filt,N
+
+def filter_export_inputParams(dirname,inputParams=None,filt=None,saveyn=True):
+    if inputParams is None:
+        inputParams = load_obj(dirname,'inputParams_success')
+    if filt is None:
+        filt = load_obj(dirname,'filt')
+    inputParams_filt,N = filter_inputParams(inputParams,filt)
+    ParametersValues = np.zeros((N,len(inputParams_filt)))
+    for i,key in enumerate(inputParams_filt):
+        ParametersValues[:,i] = np.asarray(inputParams_filt[key])
+    inputParams_mat = {'InputParams':inputParams_filt,
+                       'ParametersValues': ParametersValues}
+    if saveyn:
+        savemat(dirname.joinpath('InputParams_filt.mat').as_posix(),inputParams_mat)
+    else:
+        return inputParams_mat
+
+def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,saveyn=1,pct=(.05,.95),suffix=''):
     hdorf_matdict = {}
     Csalt = 35.0001
     Cfresh = 0
@@ -89,14 +136,8 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,sav
 
     #Load a conc_mat from .npy files in directory if not specified
     if conc_mat is None:
-        #make a point cloud for each conc array
-        conc_fnames = sorted(glob.glob(dirname.joinpath('conc*.npy').as_posix()),
-                             key=os.path.getctime)
-
-        conc_mat = np.zeros((len(conc_fnames),m.nlay,m.nrow,m.ncol),dtype=float)
-        for i,fname in enumerate(conc_fnames):
-            conc_mat[i] = np.load(fname)
-
+        conc_mat = conc_mat_from_dir(dirname,m)
+        
     from skimage import measure
     idx_dict = {}
     face_dict = {}
@@ -117,6 +158,11 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,sav
     filt = [k for k, v in idx_dict.items() if len(v[0])==0 #which indicies to get rid of
         or (filt_mat[k].max() > Csalt*1.05)
         or (filt_mat[k].min() < -.1)]
+    
+    idx_dict_filt = filter_dict(idx_dict,filt)
+    face_dict_filt = filter_dict(face_dict,filt)
+    
+    '''
     i=0
     idx_dict_filt = {}
     for k,v in idx_dict.items():
@@ -134,14 +180,14 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,sav
         else:
             face_dict_filt[i] = v
             i+=1
-
+    '''
 
     try:
         #Do the same with inputParams dictionary
         if inputParams is None:
-            m.inputParams = load_obj(dirname,'inputParams_success')
-        else:
-            m.inputParams  = inputParams
+            inputParams = load_obj(dirname,'inputParams_success')
+        inputParams_filt,N = filter_inputParams(inputParams,filt)
+        ''' 
         i=0
         inputParams_filt = {}
         for k,v in m.inputParams.items():
@@ -150,6 +196,8 @@ def compute_export_hausdorff(dirname,conc_mat=None,yxz=None,inputParams=None,sav
             if i==0:
                 N = len(vnew)
             i+=1
+        '''
+            
         ParametersValues = np.zeros((N,len(inputParams_filt)))
         for i,key in enumerate(inputParams_filt):
             ParametersValues[:,i] = np.asarray(inputParams_filt[key])
@@ -241,7 +289,7 @@ def create_concmat_from_ucndir(dirname,pattern='*.UCN',totims=(2340.0,4860.0,720
         fnames = []
         conc_mat_dict = {}
         for i,tim in enumerate(totims):
-            fnames.append('conc_mat_totim' + str(int(tim)) + '.npy')
+            fnames.append('conc_mat_totim' + str(int(tim)).zfill(5) + '.npy')
             np.save(dirname.joinpath(fnames[i]),conc_mat_filt[i,:,:,:,:])
             conc_mat_dict[fnames[i][:-4]] = conc_mat_filt[i,:,:,:,:]
         savemat(dirname.joinpath('conc_mat.mat').as_posix(),conc_mat_dict)

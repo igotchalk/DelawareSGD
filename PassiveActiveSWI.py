@@ -4,8 +4,8 @@
 
 
 #Name model
-modelname = 'homogenous_gridtest'
-tot_it = 2
+modelname = 'heterogenous_500it'
+tot_it = 500
 
 
 
@@ -285,7 +285,6 @@ Lz = 80.
 nlay = int(Lz/3)
 nrow = int(Ly/30)
 ncol = int(Lx/30)
-
 #Lx = 300.
 #Ly = 100.
 #Lz = 20.
@@ -355,10 +354,12 @@ create_MC_file()
 # In[5]:
 
 #Hydraulic conductivity field
-hkSand = 100.  #horizontal hydraulic conductivity m/day
+hkSand = 1e2  #horizontal hydraulic conductivity m/day
 hkClay = hkSand*.01
 
-heterogenous = 0 #0:homogenous,1:variogram,2:MPS
+heterogenous = 1 #0:homogenous,1:variogram,2:MPS
+clay_lyr = True
+
 
 if heterogenous==1:
     import simulationFFT
@@ -377,9 +378,15 @@ if heterogenous==1:
     hk_vals = [0,2]
 
     log10trans = True
-    plotyn= True
-    hk = truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=plotyn,saveyn=True)
-    #hk[0:int(np.where(henry_botm==find_nearest(henry_botm,ocean_elev))[0])+1,:,:] = hkSand
+    plotyn=True
+    hk = truncate_grf(grid,lith_props,hk_vals,log10trans=True,plotyn=False,saveyn=True)
+    
+    if clay_lyr:
+        lyr_ind = np.where((henry_botm<-2) & (henry_botm >-15))
+        hk[lyr_ind,:,:int(ncol*3/4)] = 10**hk_vals[0]
+        if plotyn:
+            plt.imshow(hk[:,0,:])
+    
 elif heterogenous==2:
     import sgs_mod
     nodes = 20
@@ -425,6 +432,8 @@ densesalt = 1025.
 densefresh = 1000.
 denseslp = (densesalt - densefresh) / (Csalt - Cfresh)
 #denseslp = 0 #trick for testing constant density
+
+
 
 # In[8]:
 #Winter is even stress periods, summer is odd SP.
@@ -510,7 +519,7 @@ sconc[:,:,0] = Cfresh
 icbund = np.ones((nlay, nrow, ncol), dtype=np.int)
 icbund[np.where(ibound==-1)] = -1
 
-head_inland_sum_wint = (0,0.3) #m in summer, m in winter
+head_inland_sum_wint = (0,1) #m in summer, m in winter
 
 def make_bc_dicts(head_inland_sum_wint=(0,0.3)):
     #Ocean and inland boundary types
@@ -636,6 +645,7 @@ rech = 1e-6
 
 #Assign the location of the farms
 farm_leftmargin = 10
+farm_leftmargin = int(ncol/2)
 farm_uppermargin = 1
 nfarms = 4
 farm_size = (200,200) #size in meters (row,col)
@@ -973,7 +983,7 @@ def basic_plot(m,per,backgroundplot,rowslice=0,printyn=0,contoursyn=1,**kwargs):
 
 
 # In[19]:
-per = [-1]
+per = [-1,-2]
 mas = plot_mas(m)
 rowslice = 1
 ts=''
@@ -1156,13 +1166,38 @@ def run_MC(tot_it,plotyn=False,silent=True):
         if heterogenous==0:
         #HOMOGENOUS ONLY
             #hk
-            low,high= (-3,0)
+            low,high= (-0.5,2)
             parname='hk'
             val = sample_dist(sts.uniform,1,*(low,high-low))
             add_to_paramdict(m.inputParams,parname,val)
-            hk = 10**val
+            hk = np.ones((nlay,nrow,ncol))* (10**val)
+            
+            ##por: porosity
+            #      
+            low,high = np.r_[.2,.5]
+            parname='por'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            por = val
+
         elif heterogenous in [1,2]:
             #########HETEROGENOUS ONLY ##############
+            ##por: porosity
+            #
+            low,high = np.r_[.2,.5]
+            parname='por1'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            por1 = val
+            
+            ##por: porosity
+            #
+            low,high = np.r_[.3,.7]
+            parname='por2'
+            val = sample_dist(sts.uniform,1,*(low,high-low))
+            add_to_paramdict(m.inputParams,parname,val)
+            por2 = val
+            
             #hk1
             low= -2
             high = 0
@@ -1181,7 +1216,7 @@ def run_MC(tot_it,plotyn=False,silent=True):
 
             #lith_prop
             low= 0
-            high = 0.3
+            high = 0.5
             parname='lith_prop'
             val = sample_dist(sts.uniform,1,*(low,high-low))
             add_to_paramdict(m.inputParams,parname,val)
@@ -1225,6 +1260,11 @@ def run_MC(tot_it,plotyn=False,silent=True):
                 add_to_paramdict(m.inputParams,parname,val)
                 corr_len_yx = val
 
+                #clay_lyr_yn
+                parname='clay_lyr_yn'
+                val = sample_dist(sts.binom,1,*(1,.5))
+                add_to_paramdict(m.inputParams,parname,val)
+                clay_lyr_yn = bool(val)
 
                 #Create hk grid
                 mu = np.log(hkSand)
@@ -1237,6 +1277,10 @@ def run_MC(tot_it,plotyn=False,silent=True):
                 lith_props = [lith_prop,1-lith_prop]
                 hk_vals = [hk1,hk2]
                 hk = truncate_grf(grid,lith_props,hk_vals,log10trans=False,plotyn=plotyn)
+                if clay_lyr_yn:
+                    lyr_ind = np.where((henry_botm<-2) & (henry_botm >-15))
+                    hk[lyr_ind,:,:int(ncol*3/4)] = hk_vals[0]
+
             elif heterogenous==2: #MPS
                 import sgs_mod
                 nodes = 25
@@ -1255,9 +1299,14 @@ def run_MC(tot_it,plotyn=False,silent=True):
                 hk = np.zeros(dim,dtype=np.float)
                 hk[np.where(outgrid==0)]=hk1
                 hk[np.where(outgrid==1)]=hk2
-
-        hk[wel_cells] = hk.max()
-        np.save(m.MC_file.parent.joinpath('hk'+ts+'.npy'),hk)
+            
+            hk1_ind = np.where(hk==hk.max())
+            hk2_ind = np.where(hk==hk.min())
+            por = np.ones((nlay,nrow,ncol),dtype=np.float)
+            por[hk1_ind] = por1
+            por[hk2_ind] = por2
+            hk[wel_cells] = hk.max()
+            np.save(m.MC_file.parent.joinpath('hk'+ts+'.npy'),hk)
 
         ######## END OF HETEROGENOUS BLOCK ############
 
@@ -1286,6 +1335,23 @@ def run_MC(tot_it,plotyn=False,silent=True):
         val = sample_dist(sts.uniform,1,*(low,high-low))
         add_to_paramdict(m.inputParams,parname,val)
         dmcoef = 10**val
+
+        ##sy: #specific yield
+        #      
+        low,high = np.r_[.1,.4]
+        parname='sy'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        sy = val
+
+        ##ss: specific storage
+        #      
+        low,high = np.log10([5.0e-5,5.0e-3])
+        parname='ss'
+        val = sample_dist(sts.uniform,1,*(low,high-low))
+        add_to_paramdict(m.inputParams,parname,val)
+        ss = 10**val
+
 
         ##wel
         pressure_size = 25*8*2.59e+6 #area of pressure subarea mi*mi*(m2/mi)
@@ -1347,6 +1413,13 @@ def run_MC(tot_it,plotyn=False,silent=True):
 
         #Write river data--take SSM data from WEL!!
         riv_grad = .0005
+        '''
+        measurements from Google Earth show 7 ft drop over 8 mi = avg .0001 avg gradient
+        Google Earth imagery shows that at least some patches of the river stay wet year-round (Oct 19,2016)
+        This most likely means that this is a gaining river, at least during the summer.
+        
+        '''
+        
         riv_data,ssm_data = write_river_data(riv_loc,stage,cond,riv_grad,kper_even,ssm_data)
 
         #Create instances in flopy
@@ -1386,13 +1459,6 @@ def run_MC(tot_it,plotyn=False,silent=True):
                                      densemin=0., densemax=0., denseslp=denseslp, denseref=densefresh)
 
         #Write input
-        '''DEBUG SIMPLIFYING
-        m.remove_package('RIV')
-        m.remove_package('RCH')
-        m.remove_package('WEL')
-        ssm_data = load_obj(m.MC_file.parent,'ssm_data_base')
-        wel_data = load_obj(m.MC_file.parent,'wel_data_base')
-        DEBUG SIMPLIFYING'''
         m.write_input()
 
         # Try to delete the output files, to prevent accidental use of older files
@@ -1443,9 +1509,9 @@ def run_MC(tot_it,plotyn=False,silent=True):
 
 
 # In[24]:
-tot_it = 250
+tot_it = 500
 ####Run the MC experiment ####
-inputParams,ssm_data,runlog = run_MC(tot_it,plotyn=False,silent=True)
+inputParams,ssm_data,runlog = run_MC(tot_it,plotyn=False,silent=False)
 
 
 #%%
@@ -1481,8 +1547,8 @@ for i in range(5):
         ttl = str(it) + str(list(input_success.keys())[it])
         plt.sca(axs[i,j])
         plt.title(ttl)
-        plt.hist(failMat[:,it],label='fail')
         plt.hist(succMat[:,it],label='succes')
+        plt.hist(failMat[:,it],label='fail')
         plt.tick_params(
             axis='y',          # changes apply to the x-axis
             which='both',      # both major and minor ticks are affected
@@ -1506,7 +1572,7 @@ import hausdorff_from_dir
 pers = np.cumsum(perlen)
 totims = pers[0::10]
 #totims = (2340.0,4860.0,7200.0)
-fnames = hausdorff_from_dir.create_concmat_from_ucndir(m.MC_file.parent,totims=totims)
+fnames = hausdorff_from_dir.create_concmat_from_ucndir(m.MC_file.parent,totims=totims,modsize=hk.shape)
 yxz = load_obj(m.MC_file.parent,'yxz')
 
 for i in range(len(totims)):
